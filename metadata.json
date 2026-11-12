@@ -1,0 +1,8 @@
+{
+  "name": "FMM Quantum Markets 3",
+  "description": "Futuristic financial platform for Indian and US markets with quantum physics simulations, side-by-side stock comparison, interactive charts, and real-time data integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

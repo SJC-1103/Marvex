@@ -1,0 +1,196 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-heading: 'Outfit', 'Plus Jakarta Sans', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, sans-serif;
+  }
+
+  body {
+    background-color: #06080f;
+    color: #e2e8f0;
+    font-family: var(--font-sans);
+    overflow-x: hidden;
+    letter-spacing: -0.01em;
+    selection-background-color: #6366f1;
+    selection-color: #ffffff;
+  }
+}
+
+.font-heading {
+  font-family: var(--font-heading);
+  letter-spacing: -0.02em;
+}
+
+.font-mono-code {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Subtle, refined executive ambient glows */
+.glow-subtle-cyan {
+  box-shadow: 0 0 20px -5px rgba(56, 189, 248, 0.25), 0 0 1px 1px rgba(56, 189, 248, 0.15);
+}
+
+.glow-subtle-indigo {
+  box-shadow: 0 0 20px -5px rgba(99, 102, 241, 0.25), 0 0 1px 1px rgba(99, 102, 241, 0.15);
+}
+
+.glow-subtle-emerald {
+  box-shadow: 0 0 20px -5px rgba(16, 185, 129, 0.25), 0 0 1px 1px rgba(16, 185, 129, 0.15);
+}
+
+.glow-subtle-rose {
+  box-shadow: 0 0 20px -5px rgba(244, 63, 94, 0.25), 0 0 1px 1px rgba(244, 63, 94, 0.15);
+}
+
+/* Institutional dark glass panels with hairline metallic borders */
+.quantum-card, .terminal-card {
+  background: linear-gradient(145deg, rgba(13, 18, 30, 0.82) 0%, rgba(8, 12, 22, 0.92) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.quantum-card-hover, .terminal-card-hover {
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.quantum-card-hover:hover, .terminal-card-hover:hover {
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: 0 12px 32px -4px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(99, 102, 241, 0.2), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Subtle, elegant cyber lattice */
+.cyber-grid {
+  background-size: 48px 48px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+}
+
+/* Refined minimalist scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(6, 8, 15, 0.9);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.45);
+}
+
+/* Hide scrollbar for clean tickers */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Animated Rolling Ticker Ribbon (Continuous Roll From One Side to Another) */
+@keyframes ticker-roll {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-ticker-roll {
+  display: flex;
+  width: max-content;
+  animation: ticker-roll 42s linear infinite;
+  will-change: transform;
+}
+
+.animate-ticker-roll:hover {
+  animation-play-state: paused;
+}
+
+/* Subtle organic floating animation */
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 4s ease-in-out infinite;
+}
+
+/* Gentle reveal for cards and charts */
+@keyframes fade-slide-up {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* SVG Line Draw Effect */
+@keyframes draw-path {
+  0% {
+    stroke-dashoffset: 1000;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-draw-line {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: draw-path 1.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+/* Subtle pulse glow for live badges and AI triggers */
+@keyframes pulse-gentle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.02);
+  }
+}
+
+.animate-pulse-gentle {
+  animation: pulse-gentle 3s ease-in-out infinite;
+}
+
+/* Shimmer highlight for financial ratio cards */
+@keyframes shimmer-sweep {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer-card {
+  background: linear-gradient(90deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.02) 100%);
+  background-size: 200% 100%;
+  animation: shimmer-sweep 8s linear infinite;
+}
