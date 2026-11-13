@@ -6,8 +6,38 @@ import { GoogleGenAI } from '@google/genai';
 
 dotenv.config();
 
+function resolvePortAndHost(): { port: number; host: string } {
+  const args = process.argv.slice(2);
+  let cliPort: number | null = null;
+  let cliHost: string | null = null;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--port' || arg === '-p') {
+      const next = args[i + 1];
+      if (next && !Number.isNaN(Number(next))) cliPort = parseInt(next, 10);
+    } else if (arg.startsWith('--port=')) {
+      const val = arg.slice('--port='.length);
+      if (val && !Number.isNaN(Number(val))) cliPort = parseInt(val, 10);
+    } else if (arg === '--host') {
+      const next = args[i + 1];
+      if (next) cliHost = next;
+    } else if (arg.startsWith('--host=')) {
+      cliHost = arg.slice('--host='.length);
+    }
+  }
+
+  const isProd = process.env.NODE_ENV === 'production';
+  const envPort = process.env.PORT ? parseInt(process.env.PORT, 10) : null;
+  // In dev mode, the container env often sets PORT=8080 for nginx reverse proxy;
+  // dev server must listen on port 3000 unless explicitly overridden by --port.
+  const port = cliPort ?? (isProd ? (envPort ?? 3000) : 3000);
+  const host = cliHost || process.env.HOST || '0.0.0.0';
+  return { port, host };
+}
+
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+const { port: PORT, host: HOST } = resolvePortAndHost();
 
 app.use(express.json());
 
@@ -545,15 +575,37 @@ async function startServer() {
       res.sendFile('dist/index.html', { root: '.' });
     });
   } else {
-    const vite = await createViteServer({
-      server: { middlewareMode: true, host: '0.0.0.0', port: PORT },
+    const disableHmr = process.env.DISABLE_HMR === 'true';
+    const vitePromise = createViteServer({
+      server: {
+        middlewareMode: true,
+        host: HOST,
+        port: PORT,
+        hmr: !disableHmr,
+        ws: disableHmr ? (false as const) : undefined,
+      },
       appType: 'spa',
     });
-    app.use(vite.middlewares);
+
+    // Attach middleware immediately; non-health/non-API routes await Vite readiness
+    app.use((req, res, next) => {
+      vitePromise
+        .then((vite) => vite.middlewares(req, res, next))
+        .catch(next);
+    });
+
+    vitePromise.catch((err) => {
+      console.error('Failed to initialize Vite dev server:', err);
+    });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Marvex Server listening on http://0.0.0.0:${PORT}`);
+  const httpServer = app.listen(PORT, HOST, () => {
+    console.log(`Marvex Server listening on http://${HOST}:${PORT}`);
+  });
+
+  httpServer.on('error', (err) => {
+    console.error('HTTP server listen error:', err);
+    process.exit(1);
   });
 }
 

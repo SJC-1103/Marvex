@@ -165,9 +165,9 @@ export function evaluateSingleMetric(
     }
   }
 
-  const comparator = direction === 'HIGHER_BETTER' ? '> ' : '< ';
+  const comparator = '= ';
   const benchmarkFormatted = `${comparator}${benchmark}${unit}`;
-  const actualFormatted = `${actual >= 0 && unit === '%' && actual > 0 && formulaDescription.includes('YoY') ? '+' : ''}${actual}${unit}`;
+  const actualFormatted = `${actual >= 0 && unit === '%' && actual > 0 && (formulaDescription.includes('YoY') || formulaDescription.includes('Year-over-Year')) ? '+' : ''}${actual}${unit}`;
 
   return {
     name,
@@ -205,19 +205,19 @@ function evaluateConglomerate(inputs: CompanyFinancialInputs): SuccessfulScoring
   const ebitdaGrowth = inputs.ebitdaGrowthYoy ?? 11.2;
 
   // Profitability Pillar (40% Weight)
-  const p1 = evaluateSingleMetric('EBITDA Margin', ebitdaMargin, 15.0, 35, '%', 'HIGHER_BETTER', 'EBITDA / Total Revenue', 26.087);
-  const p2 = evaluateSingleMetric('FCF Conversion (FCF/CFO)', fcfConversion, 40.0, 35, '%', 'HIGHER_BETTER', '(FCF / Operating Cash Flow) * 100', 28.44);
-  const p3 = evaluateSingleMetric('Return on Equity (ROE)', roe, 12.0, 30, '%', 'HIGHER_BETTER', 'Net Profit / Shareholders Equity', 24.19);
+  const p1 = evaluateSingleMetric('Operating EBITDA Margin', ebitdaMargin, 15.0, 35, '%', 'HIGHER_BETTER', 'Operating EBITDA / Total Revenue', 26.087);
+  const p2 = evaluateSingleMetric('Free Cash Flow Conversion (Free Cash Flow to Operating Cash Flow)', fcfConversion, 40.0, 35, '%', 'HIGHER_BETTER', '(Free Cash Flow / Operating Cash Flow) * 100', 28.44);
+  const p3 = evaluateSingleMetric('Return on Equity', roe, 12.0, 30, '%', 'HIGHER_BETTER', 'Net Profit / Shareholders Equity', 24.19);
   const profitScore = Math.min(100, p1.earnedPoints + p2.earnedPoints + p3.earnedPoints);
 
   // Solvency Pillar (35% Weight)
-  const s1 = evaluateSingleMetric('Interest Coverage Ratio', interestCoverage, 4.0, 50, 'x', 'HIGHER_BETTER', 'EBIT / Interest Expense', 18.37);
-  const s2 = evaluateSingleMetric('Debt to Equity', debtToEquity, 0.80, 50, '', 'LOWER_BETTER', 'Total Debt / Shareholders Equity', 23.68);
+  const s1 = evaluateSingleMetric('Interest Coverage Ratio', interestCoverage, 4.0, 50, ' times', 'HIGHER_BETTER', 'Operating Profit EBIT / Interest Expense', 18.37);
+  const s2 = evaluateSingleMetric('Debt to Equity Ratio', debtToEquity, 0.80, 50, '', 'LOWER_BETTER', 'Total Debt / Shareholders Equity', 23.68);
   const solvencyScore = Math.min(100, s1.earnedPoints + s2.earnedPoints);
 
   // Growth Pillar (25% Weight)
-  const g1 = evaluateSingleMetric('Revenue Growth YoY', revenueGrowth, 10.0, 60, '%', 'HIGHER_BETTER', '((Revenue_t - Revenue_t-1) / Revenue_t-1) * 100', 53.66);
-  const g2 = evaluateSingleMetric('EBITDA Expansion YoY', ebitdaGrowth, 10.0, 40, '%', 'HIGHER_BETTER', '((EBITDA_t - EBITDA_t-1) / EBITDA_t-1) * 100', 28.57);
+  const g1 = evaluateSingleMetric('Revenue Growth Year-over-Year', revenueGrowth, 10.0, 60, '%', 'HIGHER_BETTER', '((Revenue_t - Revenue_t-1) / Revenue_t-1) * 100', 53.66);
+  const g2 = evaluateSingleMetric('Operating Earnings Expansion Year-over-Year', ebitdaGrowth, 10.0, 40, '%', 'HIGHER_BETTER', '((EBITDA_t - EBITDA_t-1) / EBITDA_t-1) * 100', 28.57);
   const growthScore = Math.min(100, g1.earnedPoints + g2.earnedPoints);
 
   const verdict = Math.round(0.40 * profitScore + 0.35 * solvencyScore + 0.25 * growthScore);
@@ -231,30 +231,30 @@ function evaluateConglomerate(inputs: CompanyFinancialInputs): SuccessfulScoring
       score: profitScore,
       rating: profitScore >= 85 ? 'EXCELLENT' : 'STABLE',
       weightPercent: 40,
-      formula: '0.35 × EBITDA Margin + 0.35 × FCF Conversion + 0.30 × ROE',
-      criteriaSummary: `High cash generation and robust ${ebitdaMargin}% EBITDA margin offset petrochemical cyclicality.`,
+      formula: '0.35 × Operating EBITDA Margin + 0.35 × Free Cash Flow Conversion + 0.30 × Return on Equity',
+      criteriaSummary: `High cash generation and robust ${ebitdaMargin} percent Operating EBITDA margin offset petrochemical cyclicality.`,
       metrics: [p1, p2, p3],
     },
     solvency: {
-      name: 'Solvency & Balance Sheet Health',
+      name: 'Solvency and Balance Sheet Health',
       score: solvencyScore,
       rating: solvencyScore >= 85 ? 'VERY LOW RISK' : 'MANAGEABLE',
       weightPercent: 35,
-      formula: '0.50 × Interest Coverage + 0.50 × Balance Sheet Gearing',
-      criteriaSummary: `Substantial ${interestCoverage}x interest coverage and liquid cash treasury buffer protect solvency.`,
+      formula: '0.50 × Interest Coverage Ratio + 0.50 × Balance Sheet Gearing',
+      criteriaSummary: `Substantial ${interestCoverage} times interest coverage and liquid cash treasury buffer protect solvency.`,
       metrics: [s1, s2],
     },
     growth: {
-      name: 'Trajectory & Growth',
+      name: 'Trajectory and Growth',
       score: growthScore,
-      rating: growthScore >= 85 ? 'HIGH_GROWTH' : 'STEADY COMPOUNDER',
+      rating: growthScore >= 85 ? 'HIGH GROWTH' : 'STEADY COMPOUNDER',
       weightPercent: 25,
-      formula: '0.60 × Revenue Growth YoY + 0.40 × EBITDA Growth YoY',
-      criteriaSummary: `Consumer telecom expansion balanced by mature industrial energy segment.`,
+      formula: '0.60 × Revenue Growth Year-over-Year + 0.40 × Operating Earnings Growth Year-over-Year',
+      criteriaSummary: `Consumer telecommunications expansion balanced by mature industrial energy segment.`,
       metrics: [g1, g2],
     },
     verdictScore: verdict,
-    scoringModelFormula: `Total = 40% × Profitability (${profitScore}) + 35% × Solvency (${solvencyScore}) + 25% × Growth (${growthScore}) = ${(0.4 * profitScore + 0.35 * solvencyScore + 0.25 * growthScore).toFixed(1)} → ${verdict}/100`,
+    scoringModelFormula: `Total = 40% × Profitability (${profitScore}) + 35% × Solvency (${solvencyScore}) + 25% × Growth (${growthScore}) = ${(0.4 * profitScore + 0.35 * solvencyScore + 0.25 * growthScore).toFixed(1)} → ${verdict} out of 100`,
   };
 }
 
@@ -276,33 +276,33 @@ function evaluateItServices(inputs: CompanyFinancialInputs): SuccessfulScoringRe
   const tcvIntake = inputs.specializedMetrics?.tcvDealIntakeBillions ?? 10.0;
 
   // Profitability Pillar (40% Weight)
-  const p1 = evaluateSingleMetric('EBITDA Margin', ebitdaMargin, 22.0, 35, '%', 'HIGHER_BETTER', 'EBITDA / Total Revenue', 29.38);
-  const p2 = evaluateSingleMetric('FCF Conversion (FCF/PAT)', fcfPatConversion, 80.0, 35, '%', 'HIGHER_BETTER', '(FCF / Net Profit) * 100', 29.30);
-  const p3 = evaluateSingleMetric('Return on Equity (ROE)', roe, 25.0, 30, '%', 'HIGHER_BETTER', 'Net Profit / Net Worth', 14.52);
+  const p1 = evaluateSingleMetric('Operating EBITDA Margin', ebitdaMargin, 22.0, 35, '%', 'HIGHER_BETTER', 'EBITDA / Total Revenue', 29.38);
+  const p2 = evaluateSingleMetric('Free Cash Flow Conversion (Free Cash Flow to Profit After Tax)', fcfPatConversion, 80.0, 35, '%', 'HIGHER_BETTER', '(Free Cash Flow / Net Profit) * 100', 29.30);
+  const p3 = evaluateSingleMetric('Return on Equity', roe, 25.0, 30, '%', 'HIGHER_BETTER', 'Net Profit / Net Worth', 14.52);
   const profitScore = Math.min(100, p1.earnedPoints + p2.earnedPoints + p3.earnedPoints);
 
   // Solvency Pillar (35% Weight)
   // Zero debt earns full 50 points; otherwise scaled down
   const s1Earned = inputs.totalDebt === 0 ? 50 : Math.max(0, Math.round(50 - (debtToEquity * 50)));
   const s1: EvaluatedMetric = {
-    name: 'Total Debt / Borrowings',
+    name: 'Total Debt and Borrowings',
     actualValue: inputs.totalDebt,
-    actualFormatted: inputs.totalDebt === 0 ? '₹0 Cr' : `₹${inputs.totalDebt} Cr`,
+    actualFormatted: inputs.totalDebt === 0 ? 'Zero Debt' : `₹${inputs.totalDebt} Crores`,
     benchmarkValue: 0,
-    benchmarkFormatted: 'Zero Debt',
+    benchmarkFormatted: '= Zero Debt',
     direction: 'LOWER_BETTER',
     maxPoints: 50,
     earnedPoints: s1Earned,
-    formulaDescription: 'Zero Total Debt = 50 pts',
-    normalizationFormula: 'TotalDebt === 0 ? 50 : max(0, 50 - (D/E * 50))',
+    formulaDescription: 'Zero Total Debt = 50 points',
+    normalizationFormula: 'TotalDebt === 0 ? 50 : max(0, 50 - (DebtToEquity * 50))',
     roundingRule: 'round',
   };
-  const s2 = evaluateSingleMetric('Cash to Liabilities Ratio', cashToLiabilities, 30.0, 50, '%', 'HIGHER_BETTER', '(Cash & Bank / Total Liabilities) * 100', 29.81);
+  const s2 = evaluateSingleMetric('Cash to Total Liabilities Ratio', cashToLiabilities, 30.0, 50, '%', 'HIGHER_BETTER', '(Cash and Bank / Total Liabilities) * 100', 29.81);
   const solvencyScore = Math.min(100, s1.earnedPoints + s2.earnedPoints);
 
   // Growth Pillar (25% Weight)
-  const g1 = evaluateSingleMetric('Revenue Growth YoY', revenueGrowth, 10.0, 60, '%', 'HIGHER_BETTER', 'Constant currency YoY growth', 55.26);
-  const g2 = evaluateSingleMetric('TCV Deal Intake', tcvIntake, 9.0, 40, 'B', 'HIGHER_BETTER', 'Total Contract Value deal bookings', 28.80);
+  const g1 = evaluateSingleMetric('Revenue Growth Year-over-Year', revenueGrowth, 10.0, 60, '%', 'HIGHER_BETTER', 'Constant currency Year-over-Year growth', 55.26);
+  const g2 = evaluateSingleMetric('Total Contract Value Deal Intake', tcvIntake, 9.0, 40, ' Billion', 'HIGHER_BETTER', 'Total Contract Value deal bookings', 28.80);
   const growthScore = Math.min(100, g1.earnedPoints + g2.earnedPoints);
 
   const verdict = Math.round(0.40 * profitScore + 0.35 * solvencyScore + 0.25 * growthScore);
@@ -316,30 +316,30 @@ function evaluateItServices(inputs: CompanyFinancialInputs): SuccessfulScoringRe
       score: profitScore,
       rating: profitScore >= 85 ? 'EXCELLENT' : 'STABLE',
       weightPercent: 40,
-      formula: '0.35 × EBITDA Margin + 0.35 × FCF Conversion + 0.30 × ROE',
-      criteriaSummary: `Benchmark ${ebitdaMargin}% margin and elite ${roe}% ROE place company in top tier of global tech services.`,
+      formula: '0.35 × Operating EBITDA Margin + 0.35 × Free Cash Flow Conversion + 0.30 × Return on Equity',
+      criteriaSummary: `Benchmark ${ebitdaMargin} percent margin and elite ${roe} percent Return on Equity place company in top tier of global technology services.`,
       metrics: [p1, p2, p3],
     },
     solvency: {
-      name: 'Solvency & Balance Sheet Health',
+      name: 'Solvency and Balance Sheet Health',
       score: solvencyScore,
       rating: 'PRISTINE ZERO DEBT',
       weightPercent: 35,
-      formula: '0.50 × Total Debt / Borrowings + 0.50 × Net Cash Position',
+      formula: '0.50 × Total Debt and Borrowings + 0.50 × Net Cash Position',
       criteriaSummary: `Debt-free balance sheet with substantial liquid bank balances.`,
       metrics: [s1, s2],
     },
     growth: {
-      name: 'Trajectory & Growth',
+      name: 'Trajectory and Growth',
       score: growthScore,
       rating: 'STEADY COMPOUNDER',
       weightPercent: 25,
-      formula: '0.60 × Revenue Growth YoY + 0.40 × Deal Pipeline Momentum',
+      formula: '0.60 × Revenue Growth Year-over-Year + 0.40 × Deal Pipeline Momentum',
       criteriaSummary: `Resilient constant currency growth supported by recurring enterprise contracts.`,
       metrics: [g1, g2],
     },
     verdictScore: verdict,
-    scoringModelFormula: `Total = 40% × Profitability (${profitScore}) + 35% × Solvency (${solvencyScore}) + 25% × Growth (${growthScore}) = ${(0.4 * profitScore + 0.35 * solvencyScore + 0.25 * growthScore).toFixed(1)} → ${verdict}/100`,
+    scoringModelFormula: `Total = 40% × Profitability (${profitScore}) + 35% × Solvency (${solvencyScore}) + 25% × Growth (${growthScore}) = ${(0.4 * profitScore + 0.35 * solvencyScore + 0.25 * growthScore).toFixed(1)} → ${verdict} out of 100`,
   };
 }
 
@@ -358,19 +358,19 @@ function evaluateBanking(inputs: CompanyFinancialInputs): SuccessfulScoringResul
   };
 
   // Profitability Pillar (40% Weight)
-  const p1 = evaluateSingleMetric('Return on Assets (ROA)', b.returnOnAssetsPercent, 1.60, 40, '%', 'HIGHER_BETTER', 'Net Profit / Average Total Assets', 31.67);
-  const p2 = evaluateSingleMetric('Net Interest Margin (NIM)', b.netInterestMarginPercent, 3.30, 35, '%', 'HIGHER_BETTER', 'Net Interest Income / Earning Assets', 29.57);
+  const p1 = evaluateSingleMetric('Return on Assets', b.returnOnAssetsPercent, 1.60, 40, '%', 'HIGHER_BETTER', 'Net Profit / Average Total Assets', 31.67);
+  const p2 = evaluateSingleMetric('Net Interest Margin', b.netInterestMarginPercent, 3.30, 35, '%', 'HIGHER_BETTER', 'Net Interest Income / Earning Assets', 29.57);
   const p3 = evaluateSingleMetric('Cost to Income Ratio', b.costToIncomePercent, 42.0, 25, '%', 'LOWER_BETTER', 'Operating Expenses / Total Operating Income', 0.131);
   const profitScore = Math.min(100, p1.earnedPoints + p2.earnedPoints + p3.earnedPoints);
 
   // Solvency Pillar (35% Weight) - Banking Solvency is Capital Adequacy & Asset Quality
-  const s1 = evaluateSingleMetric('Capital Adequacy Ratio (CAR)', b.capitalAdequacyRatioPercent, 15.0, 60, '%', 'HIGHER_BETTER', 'Total Capital / Risk-Weighted Assets', 42.42);
-  const s2 = evaluateSingleMetric('Gross NPA Ratio', b.grossNpaPercent, 2.00, 40, '%', 'LOWER_BETTER', 'Gross Bad Loans / Total Advances', 2.94);
+  const s1 = evaluateSingleMetric('Capital Adequacy Ratio', b.capitalAdequacyRatioPercent, 15.0, 60, '%', 'HIGHER_BETTER', 'Total Capital / Risk-Weighted Assets', 42.42);
+  const s2 = evaluateSingleMetric('Gross Non-Performing Assets Ratio', b.grossNpaPercent, 2.00, 40, '%', 'LOWER_BETTER', 'Gross Bad Loans / Total Advances', 2.94);
   const solvencyScore = Math.min(100, s1.earnedPoints + s2.earnedPoints);
 
   // Growth Pillar (25% Weight)
-  const g1 = evaluateSingleMetric('Deposit Accretion YoY', b.depositGrowthYoyPercent, 12.0, 50, '%', 'HIGHER_BETTER', '((Deposits_t - Deposits_t-1) / Deposits_t-1) * 100', 33.51);
-  const g2 = evaluateSingleMetric('Credit Advance Growth YoY', b.advanceGrowthYoyPercent, 12.0, 50, '%', 'HIGHER_BETTER', '((Loans_t - Loans_t-1) / Loans_t-1) * 100', 33.91);
+  const g1 = evaluateSingleMetric('Deposit Accretion Year-over-Year', b.depositGrowthYoyPercent, 12.0, 50, '%', 'HIGHER_BETTER', '((Deposits_t - Deposits_t-1) / Deposits_t-1) * 100', 33.51);
+  const g2 = evaluateSingleMetric('Credit Advance Growth Year-over-Year', b.advanceGrowthYoyPercent, 12.0, 50, '%', 'HIGHER_BETTER', '((Loans_t - Loans_t-1) / Loans_t-1) * 100', 33.91);
   const growthScore = Math.min(100, g1.earnedPoints + g2.earnedPoints);
 
   const verdict = Math.round(0.40 * profitScore + 0.35 * solvencyScore + 0.25 * growthScore);
@@ -384,30 +384,30 @@ function evaluateBanking(inputs: CompanyFinancialInputs): SuccessfulScoringResul
       score: profitScore,
       rating: 'EXCELLENT',
       weightPercent: 40,
-      formula: '0.40 × Return on Assets (ROA) + 0.35 × Net Interest Margin + 0.25 × Cost-to-Income',
-      criteriaSummary: `Top-tier ${b.returnOnAssetsPercent}% ROA and efficient ${b.costToIncomePercent}% cost-to-income lead banking peers.`,
+      formula: '0.40 × Return on Assets + 0.35 × Net Interest Margin + 0.25 × Cost-to-Income',
+      criteriaSummary: `Top-tier ${b.returnOnAssetsPercent} percent Return on Assets and efficient ${b.costToIncomePercent} percent cost-to-income lead banking peers.`,
       metrics: [p1, p2, p3],
     },
     solvency: {
-      name: 'Solvency & Capital Adequacy',
+      name: 'Solvency and Capital Adequacy',
       score: solvencyScore,
       rating: 'VERY LOW RISK',
       weightPercent: 35,
-      formula: '0.60 × Capital Adequacy (CAR) + 0.40 × Asset Quality (GNPA)',
-      criteriaSummary: `Exceptional ${b.capitalAdequacyRatioPercent}% CAR exceeds regulatory minimums with pristine ${b.grossNpaPercent}% GNPA.`,
+      formula: '0.60 × Capital Adequacy Ratio + 0.40 × Asset Quality Gross Non-Performing Assets',
+      criteriaSummary: `Exceptional ${b.capitalAdequacyRatioPercent} percent Capital Adequacy Ratio exceeds regulatory minimums with pristine ${b.grossNpaPercent} percent Gross Non-Performing Assets.`,
       metrics: [s1, s2],
     },
     growth: {
-      name: 'Trajectory & Growth',
+      name: 'Trajectory and Growth',
       score: growthScore,
       rating: 'STEADY COMPOUNDER',
       weightPercent: 25,
-      formula: '0.50 × Deposit Growth YoY + 0.50 × Advance Loan Growth YoY',
-      criteriaSummary: `Deposit accretion expanded +${b.depositGrowthYoyPercent}% YoY restoring balanced credit-deposit ratio.`,
+      formula: '0.50 × Deposit Growth Year-over-Year + 0.50 × Advance Loan Growth Year-over-Year',
+      criteriaSummary: `Deposit accretion expanded +${b.depositGrowthYoyPercent} percent Year-over-Year restoring balanced credit-deposit ratio.`,
       metrics: [g1, g2],
     },
     verdictScore: verdict,
-    scoringModelFormula: `Total = 40% × Profitability (${profitScore}) + 35% × Solvency (${solvencyScore}) + 25% × Growth (${growthScore}) = ${(0.4 * profitScore + 0.35 * solvencyScore + 0.25 * growthScore).toFixed(1)} → ${verdict}/100`,
+    scoringModelFormula: `Total = 40% × Profitability (${profitScore}) + 35% × Solvency (${solvencyScore}) + 25% × Growth (${growthScore}) = ${(0.4 * profitScore + 0.35 * solvencyScore + 0.25 * growthScore).toFixed(1)} → ${verdict} out of 100`,
   };
 }
 
@@ -427,18 +427,18 @@ function evaluateTechnology(inputs: CompanyFinancialInputs): SuccessfulScoringRe
 
   // Profitability Pillar (40% Weight)
   const p1 = evaluateSingleMetric('Gross Profit Margin', grossMargin, 55.0, 35, '%', 'HIGHER_BETTER', '(Gross Profit / Total Revenue) * 100', 25.63);
-  const p2 = evaluateSingleMetric('EBITDA Margin', ebitdaMargin, 35.0, 35, '%', 'HIGHER_BETTER', 'EBITDA / Total Revenue', 19.60);
-  const p3 = evaluateSingleMetric('FCF Conversion (FCF/PAT)', fcfConversion, 60.0, 30, '%', 'HIGHER_BETTER', '(FCF / Net Profit) * 100', 23.18);
+  const p2 = evaluateSingleMetric('Operating EBITDA Margin', ebitdaMargin, 35.0, 35, '%', 'HIGHER_BETTER', 'EBITDA / Total Revenue', 19.60);
+  const p3 = evaluateSingleMetric('Free Cash Flow Conversion (Free Cash Flow to Profit After Tax)', fcfConversion, 60.0, 30, '%', 'HIGHER_BETTER', '(Free Cash Flow / Net Profit) * 100', 23.18);
   const profitScore = Math.min(100, p1.earnedPoints + p2.earnedPoints + p3.earnedPoints);
 
   // Solvency Pillar (35% Weight)
-  const s1 = evaluateSingleMetric('Net Cash Treasury Surplus', netCashSurplusBillions, 10.0, 50, 'B', 'HIGHER_BETTER', 'Cash & Equivalents - Total Debt', 20.25);
+  const s1 = evaluateSingleMetric('Net Cash Treasury Surplus', netCashSurplusBillions, 10.0, 50, ' Billion', 'HIGHER_BETTER', 'Cash and Equivalents - Total Debt', 20.25);
   const s2 = evaluateSingleMetric('Debt to Equity Ratio', debtToEquity, 0.50, 50, '', 'LOWER_BETTER', 'Total Debt / Shareholders Equity', 22.22);
   const solvencyScore = Math.min(100, s1.earnedPoints + s2.earnedPoints);
 
   // Growth Pillar (25% Weight)
-  const g1 = evaluateSingleMetric('Revenue Growth YoY', revenueGrowth, 30.0, 60, '%', 'HIGHER_BETTER', 'Top-line hyper-scale expansion', 18.51);
-  const g2 = evaluateSingleMetric('Datacenter Segment Scale', datacenterScale, 20.0, 40, 'B', 'HIGHER_BETTER', 'Accelerated computing revenue quarterly scale', 24.68);
+  const g1 = evaluateSingleMetric('Revenue Growth Year-over-Year', revenueGrowth, 30.0, 60, '%', 'HIGHER_BETTER', 'Top-line hyper-scale expansion', 18.51);
+  const g2 = evaluateSingleMetric('Datacenter Segment Scale', datacenterScale, 20.0, 40, ' Billion', 'HIGHER_BETTER', 'Accelerated computing revenue quarterly scale', 24.68);
   const growthScore = Math.min(100, g1.earnedPoints + g2.earnedPoints);
 
   const verdict = Math.round(0.40 * profitScore + 0.35 * solvencyScore + 0.25 * growthScore);
@@ -452,30 +452,30 @@ function evaluateTechnology(inputs: CompanyFinancialInputs): SuccessfulScoringRe
       score: profitScore,
       rating: 'EXTRAORDINARY',
       weightPercent: 40,
-      formula: '0.35 × Gross Margin + 0.35 × EBITDA Margin + 0.30 × FCF Conversion',
-      criteriaSummary: `Historic ${grossMargin}% gross margin and ${ebitdaMargin}% EBITDA margin demonstrate monopolistic pricing power.`,
+      formula: '0.35 × Gross Profit Margin + 0.35 × Operating EBITDA Margin + 0.30 × Free Cash Flow Conversion',
+      criteriaSummary: `Historic ${grossMargin} percent gross margin and ${ebitdaMargin} percent Operating EBITDA margin demonstrate monopolistic pricing power.`,
       metrics: [p1, p2, p3],
     },
     solvency: {
-      name: 'Solvency & Capital Architecture',
+      name: 'Solvency and Capital Architecture',
       score: solvencyScore,
       rating: 'VERY LOW RISK',
       weightPercent: 35,
-      formula: '0.50 × Net Cash Surplus + 0.50 × Low Leverage (Debt/Equity)',
-      criteriaSummary: `Net cash surplus of $${netCashSurplusBillions}B provides immense strategic liquidity.`,
+      formula: '0.50 × Net Cash Surplus + 0.50 × Low Leverage Debt to Equity',
+      criteriaSummary: `Net cash surplus of $${netCashSurplusBillions} Billion provides immense strategic liquidity.`,
       metrics: [s1, s2],
     },
     growth: {
-      name: 'Trajectory & Growth',
+      name: 'Trajectory and Growth',
       score: growthScore,
       rating: 'HYPER EXPONENTIAL',
       weightPercent: 25,
-      formula: '0.60 × Revenue Growth YoY + 0.40 × Datacenter Segment Expansion',
-      criteriaSummary: `Revenue surged +${revenueGrowth}% YoY driven by global hyperscaler datacenter capex commitments.`,
+      formula: '0.60 × Revenue Growth Year-over-Year + 0.40 × Datacenter Segment Expansion',
+      criteriaSummary: `Revenue surged +${revenueGrowth} percent Year-over-Year driven by global hyperscaler datacenter capital investment commitments.`,
       metrics: [g1, g2],
     },
     verdictScore: verdict,
-    scoringModelFormula: `Total = 40% × Profitability (${profitScore}) + 35% × Solvency (${solvencyScore}) + 25% × Growth (${growthScore}) = ${(0.4 * profitScore + 0.35 * solvencyScore + 0.25 * growthScore).toFixed(1)} → ${verdict}/100`,
+    scoringModelFormula: `Total = 40% × Profitability (${profitScore}) + 35% × Solvency (${solvencyScore}) + 25% × Growth (${growthScore}) = ${(0.4 * profitScore + 0.35 * solvencyScore + 0.25 * growthScore).toFixed(1)} → ${verdict} out of 100`,
   };
 }
 
@@ -494,19 +494,19 @@ function evaluateAutomotive(inputs: CompanyFinancialInputs): SuccessfulScoringRe
   const energyGrowth = inputs.specializedMetrics?.energyStorageDeploymentGrowthPercent ?? 75.0;
 
   // Profitability Pillar (40% Weight)
-  const p1 = evaluateSingleMetric('Auto Gross Margin (ex-credits)', autoGrossMargin, 18.0, 40, '%', 'HIGHER_BETTER', 'Auto Gross Profit / Auto Revenue', 29.47);
+  const p1 = evaluateSingleMetric('Automotive Gross Margin (excluding regulatory credits)', autoGrossMargin, 18.0, 40, '%', 'HIGHER_BETTER', 'Automotive Gross Profit / Automotive Revenue', 29.47);
   const p2 = evaluateSingleMetric('Operating Margin', opMargin, 10.0, 35, '%', 'HIGHER_BETTER', 'Operating Profit / Total Revenue', 24.07);
-  const p3 = evaluateSingleMetric('Free Cash Flow Conversion', fcfConversion, 35.0, 25, '%', 'HIGHER_BETTER', '(FCF / Operating Cash Flow) * 100', 15.95);
+  const p3 = evaluateSingleMetric('Free Cash Flow Conversion (Free Cash Flow to Operating Cash Flow)', fcfConversion, 35.0, 25, '%', 'HIGHER_BETTER', '(Free Cash Flow / Operating Cash Flow) * 100', 15.95);
   const profitScore = Math.min(100, p1.earnedPoints + p2.earnedPoints + p3.earnedPoints);
 
   // Solvency Pillar (35% Weight)
-  const s1 = evaluateSingleMetric('Cash Reserves Buffer', cashReservesBillions, 15.0, 50, 'B', 'HIGHER_BETTER', 'Cash & Equivalents Balance', 21.43);
+  const s1 = evaluateSingleMetric('Cash Reserves Buffer', cashReservesBillions, 15.0, 50, ' Billion', 'HIGHER_BETTER', 'Cash and Liquid Short-Term Reserves', 21.43);
   const s2 = evaluateSingleMetric('Debt to Equity Ratio', debtToEquity, 0.40, 50, '', 'LOWER_BETTER', 'Total Debt / Shareholders Net Worth', 45.45);
   const solvencyScore = Math.min(100, s1.earnedPoints + s2.earnedPoints);
 
   // Growth Pillar (25% Weight)
-  const g1 = evaluateSingleMetric('Vehicle Deliveries Growth YoY', vehicleGrowth, 15.0, 50, '%', 'HIGHER_BETTER', 'Annual unit volume delivery expansion', 65.63);
-  const g2 = evaluateSingleMetric('Energy Storage Deployment YoY', energyGrowth, 40.0, 50, '%', 'HIGHER_BETTER', 'Megapack utility storage GWh deployments', 23.47);
+  const g1 = evaluateSingleMetric('Vehicle Deliveries Growth Year-over-Year', vehicleGrowth, 15.0, 50, '%', 'HIGHER_BETTER', 'Annual unit volume delivery expansion', 65.63);
+  const g2 = evaluateSingleMetric('Energy Storage Deployment Year-over-Year', energyGrowth, 40.0, 50, '%', 'HIGHER_BETTER', 'Megapack utility storage gigawatt-hour deployments', 23.47);
   const growthScore = Math.min(100, g1.earnedPoints + g2.earnedPoints);
 
   const verdict = Math.round(0.40 * profitScore + 0.35 * solvencyScore + 0.25 * growthScore);
@@ -520,30 +520,30 @@ function evaluateAutomotive(inputs: CompanyFinancialInputs): SuccessfulScoringRe
       score: profitScore,
       rating: 'STABLE',
       weightPercent: 40,
-      formula: '0.40 × Auto Gross Margin + 0.35 × Operating Margin + 0.25 × FCF Conversion',
-      criteriaSummary: `Automotive margins stabilized at ${autoGrossMargin}% while energy storage gross margins offset vehicle pricing cuts.`,
+      formula: '0.40 × Automotive Gross Margin + 0.35 × Operating Margin + 0.25 × Free Cash Flow Conversion',
+      criteriaSummary: `Automotive margins stabilized at ${autoGrossMargin} percent while energy storage gross margins offset vehicle pricing cuts.`,
       metrics: [p1, p2, p3],
     },
     solvency: {
-      name: 'Solvency & Balance Sheet Health',
+      name: 'Solvency and Balance Sheet Health',
       score: solvencyScore,
       rating: 'FORTRESS BALANCE SHEET',
       weightPercent: 35,
-      formula: '0.50 × Cash Reserve Buffer + 0.50 × Conservative Debt Leverage',
-      criteriaSummary: `$${cashReservesBillions}B liquid treasury provides self-funding runway for AI & compute scaling.`,
+      formula: '0.50 × Cash Reserves Buffer + 0.50 × Conservative Debt Leverage',
+      criteriaSummary: `$${cashReservesBillions} Billion liquid treasury provides self-funding runway for AI and compute scaling.`,
       metrics: [s1, s2],
     },
     growth: {
-      name: 'Trajectory & Growth',
+      name: 'Trajectory and Growth',
       score: growthScore,
       rating: 'ENERGY POWERED',
       weightPercent: 25,
-      formula: '0.50 × Auto Delivery Growth + 0.50 × Energy Storage Deployment YoY',
-      criteriaSummary: `Vehicle delivery growth moderated to +${vehicleGrowth}% while Energy Megapack deployments surged +${energyGrowth}% YoY.`,
+      formula: '0.50 × Automotive Delivery Growth + 0.50 × Energy Storage Deployment Year-over-Year',
+      criteriaSummary: `Vehicle delivery growth moderated to +${vehicleGrowth} percent while Energy Megapack deployments surged +${energyGrowth} percent Year-over-Year.`,
       metrics: [g1, g2],
     },
     verdictScore: verdict,
-    scoringModelFormula: `Total = 40% × Profitability (${profitScore}) + 35% × Solvency (${solvencyScore}) + 25% × Growth (${growthScore}) = ${(0.4 * profitScore + 0.35 * solvencyScore + 0.25 * growthScore).toFixed(1)} → ${verdict}/100`,
+    scoringModelFormula: `Total = 40% × Profitability (${profitScore}) + 35% × Solvency (${solvencyScore}) + 25% × Growth (${growthScore}) = ${(0.4 * profitScore + 0.35 * solvencyScore + 0.25 * growthScore).toFixed(1)} → ${verdict} out of 100`,
   };
 }
 

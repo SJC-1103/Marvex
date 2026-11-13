@@ -296,4 +296,29 @@ const unknownScoring = getCompanyScoringResult('UNKNOWN_CORP');
 assert(unknownScoring.status === 'UNSUPPORTED_SECTOR', 'getCompanyScoringResult for unmapped company returns UNSUPPORTED_SECTOR');
 assert(unknownScoring.verdictScore === null, 'getCompanyScoringResult returns null score (never default 80)');
 
+console.log('\n--- 6. Testing Universal Share Selection & getOrBuildDossierForStock ---');
+import { getOrBuildDossierForStock } from '../data/financialStatementsData';
+
+const tataDossier = getOrBuildDossierForStock('TATAMOTORS');
+assert(tataDossier.symbol === 'TATAMOTORS', 'TATAMOTORS dossier retrieved successfully');
+assert(tataDossier.highlights.verdictScore > 0, `TATAMOTORS has calculated score (${tataDossier.highlights.verdictScore})`);
+
+const infyDossier = getOrBuildDossierForStock('INFY');
+assert(infyDossier.symbol === 'INFY', 'INFY dossier retrieved successfully');
+assert(infyDossier.highlights.verdictScore > 0, `INFY has calculated score (${infyDossier.highlights.verdictScore})`);
+
+const anyShareDossier = getOrBuildDossierForStock('NEW_CUSTOM_SHARE');
+assert(anyShareDossier.symbol === 'NEW_CUSTOM_SHARE', 'Arbitrary custom share dossier built dynamically');
+assert(anyShareDossier.highlights.verdictScore > 0, `Arbitrary share has calculated score (${anyShareDossier.highlights.verdictScore})`);
+
+// Verify benchmark comparator is '=' and not '>'
+if (relResult.status === 'SUCCESS' && relResult.profitability) {
+  assert(
+    relResult.profitability.metrics[0].benchmarkFormatted.startsWith('='),
+    `Benchmark displays '=', got ${relResult.profitability.metrics[0].benchmarkFormatted}`
+  );
+}
+
 console.log('\n🎉 ALL SCORING ENGINE AND DOSSIER INTEGRATION TESTS PASSED SUCCESSFULLY!\n');
+
+

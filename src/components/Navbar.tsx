@@ -83,19 +83,19 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const navItems: NavItem[] = marketMode === 'DERIVATIVES'
     ? [
-        { id: 'derivatives', label: 'Derivatives & F&O Lab', icon: Layers },
-        { id: 'ownership', label: 'Ownership & Anomaly Intelligence', icon: Users },
+        { id: 'derivatives', label: 'Derivatives and Futures and Options Laboratory', icon: Layers },
+        { id: 'ownership', label: 'Ownership and Anomaly Intelligence', icon: Users },
         { id: 'overview', label: 'Cash Spot Markets', icon: LayoutDashboard },
         { id: 'portfolio', label: 'Portfolio Ledger', icon: Briefcase, badge: activeBook?.holdings?.length },
-        { id: 'settings', label: 'Settings & Data Feeds', icon: Settings },
+        { id: 'settings', label: 'Settings and Data Feeds', icon: Settings },
       ]
     : [
         { id: 'overview', label: 'Market Overview', icon: LayoutDashboard },
         { id: 'portfolio', label: 'Portfolio Ledger', icon: Briefcase, badge: activeBook?.holdings?.length },
-        { id: 'financials', label: 'Financial Statements & Highlights', icon: FileText },
-        { id: 'ownership', label: 'Ownership & Anomalies', icon: Users },
-        { id: 'analyze', label: 'Technical Analysis & Compare', icon: Compass },
-        { id: 'settings', label: 'Settings & Data Feeds', icon: Settings },
+        { id: 'financials', label: 'Financial Statements and Highlights', icon: FileText },
+        { id: 'ownership', label: 'Ownership and Anomalies', icon: Users },
+        { id: 'analyze', label: 'Technical Analysis and Comparison', icon: Compass },
+        { id: 'settings', label: 'Settings and Data Feeds', icon: Settings },
       ];
 
   return (
@@ -126,7 +126,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     MARVEX<span className="text-sky-400 font-light ml-0.5">.QUANT</span>
                   </span>
                   <span className="hidden xl:inline-block text-[9px] font-mono-code px-1.5 py-0.2 rounded border border-white/[0.08] bg-white/[0.03] text-slate-400">
-                    NSE · BSE · US
+                    Verified Global Equities
                   </span>
                 </div>
                 <span className="text-[10px] text-slate-400 font-sans hidden md:block leading-tight">
@@ -179,7 +179,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                             <div className="truncate pr-2">
                               <div className="truncate font-sans">{book.name}</div>
                               <div className="text-[10px] text-slate-500 font-mono-code">
-                                {book.holdings.length} positions · {book.baseCurrency}
+                                {book.holdings.length} positions in {book.baseCurrency}
                               </div>
                             </div>
                             {isCurrent && <Check className="w-3.5 h-3.5 text-sky-400 shrink-0" />}
@@ -220,9 +220,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                     ? 'bg-sky-500/25 text-sky-300 border border-sky-500/40 shadow-sm'
                     : 'text-slate-400 hover:text-white'
                 }`}
-                title="Regular Stock Market (Cash Equities, Mutual Funds, Indices)"
+                title="Stock Market (Cash Equities, Mutual Funds, Indices)"
               >
-                <span>Stocks</span>
+                <span>Stock Market</span>
               </button>
               <button
                 onClick={() => {
@@ -235,9 +235,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                     ? 'bg-purple-600/35 text-purple-300 border border-purple-500/50 shadow-sm'
                     : 'text-slate-400 hover:text-white'
                 }`}
-                title="Futures & Options Market (Payoff Matrix, Greeks, Chains)"
+                title="Futures and Options Market (Payoff Matrix, Greeks, Chains)"
               >
-                <span>F&O</span>
+                <span>Futures and Options</span>
               </button>
             </div>
 
@@ -246,14 +246,14 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 onClick={onToggleCurrency}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] hover:border-sky-500/30 text-xs font-mono-code font-bold transition active:scale-95"
-                title={`$1.00 USD = ₹${exchangeRate.toFixed(2)} INR (Click to switch view currency)`}
+                title={`One United States Dollar equals ${exchangeRate.toFixed(2)} Indian Rupees (Click to switch view currency)`}
               >
                 <span className={currency === 'INR' ? 'text-sky-300 font-extrabold' : 'text-slate-400'}>
-                  ₹ INR
+                  INR
                 </span>
-                <span className="text-slate-600 font-normal">/</span>
+                <span className="text-slate-400 font-normal text-[10px]">or</span>
                 <span className={currency === 'USD' ? 'text-sky-300 font-extrabold' : 'text-slate-400'}>
-                  $ USD
+                  USD
                 </span>
               </button>
 
@@ -261,7 +261,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className="absolute right-0 top-full mt-2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50 whitespace-nowrap">
                 <div className="px-3 py-1.5 rounded-lg bg-[#0b101e] border border-white/[0.15] shadow-2xl text-[11px] font-mono-code text-slate-200 flex items-center gap-2">
                   <span className="text-slate-400">Exchange Rate:</span>
-                  <span className="text-emerald-400 font-bold">$1.00 USD = ₹{exchangeRate.toFixed(2)} INR</span>
+                  <span className="text-emerald-400 font-bold">One United States Dollar equals {exchangeRate.toFixed(2)} Indian Rupees</span>
                 </div>
               </div>
             </div>

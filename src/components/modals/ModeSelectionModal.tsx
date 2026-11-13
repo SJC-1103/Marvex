@@ -1,6 +1,6 @@
 import React from 'react';
 import { MarketMode } from '../Navbar';
-import { LayoutDashboard, Layers, ArrowRight, ShieldCheck, Activity, Sparkles, TrendingUp, Compass } from 'lucide-react';
+import { LayoutDashboard, Layers, ArrowRight, ShieldCheck } from 'lucide-react';
 import { playQuantumBeep } from '../../utils/audio';
 
 interface ModeSelectionModalProps {
@@ -61,8 +61,8 @@ export const ModeSelectionModal: React.FC<ModeSelectionModalProps> = ({
                 <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/25 text-sky-400 flex items-center justify-center group-hover:scale-105 transition-transform">
                   <LayoutDashboard className="w-5 h-5" />
                 </div>
-                <span className="text-[10px] font-mono-code px-2 py-0.5 rounded-md bg-sky-500/20 text-sky-300 font-bold">
-                  SPOT & WEALTH
+                <span className="text-[10px] font-mono-code px-2.5 py-0.5 rounded-md bg-sky-500/20 text-sky-300 font-bold uppercase tracking-wider">
+                  Spot and Wealth Management
                 </span>
               </div>
 
@@ -71,33 +71,34 @@ export const ModeSelectionModal: React.FC<ModeSelectionModalProps> = ({
                   Stock Market Terminal
                 </h3>
                 <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-                  Cash equities, multi-book portfolio tracking, mutual fund NAVs, shareholder demographics, and market decoupling diagnostics.
+                  Cash equities, multi-book portfolio tracking, mutual fund Net Asset Values, shareholder demographics, and market decoupling diagnostics.
                 </p>
               </div>
 
-              <div className="space-y-1.5 pt-2 border-t border-white/[0.06] text-[11px] font-mono-code text-slate-400">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sky-400">•</span>
-                  <span>NSE & BSE Bhavcopy settlement</span>
+              {/* Feature Spans: First span is pure human-readable text with no special characters */}
+              <div className="space-y-2 pt-2.5 border-t border-white/[0.06] text-[11px] font-mono-code">
+                <div className="flex items-start gap-2">
+                  <span className="text-sky-400 font-bold shrink-0">Settlement</span>
+                  <span className="text-slate-300">National Stock Exchange and Bombay Stock Exchange official closing data</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sky-400">•</span>
-                  <span>Promoter vs. Public demographic bars</span>
+                <div className="flex items-start gap-2">
+                  <span className="text-sky-400 font-bold shrink-0">Demographics</span>
+                  <span className="text-slate-300">Promoter versus Public shareholder ownership distribution</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sky-400">•</span>
-                  <span>AI stock contradiction assistant</span>
+                <div className="flex items-start gap-2">
+                  <span className="text-sky-400 font-bold shrink-0">Intelligence</span>
+                  <span className="text-slate-300">Artificial Intelligence valuation divergence analysis</span>
                 </div>
               </div>
             </div>
 
             <div className="mt-5 flex items-center justify-between pt-3 border-t border-white/[0.06] text-xs font-mono-code font-bold text-sky-400 group-hover:text-sky-300">
-              <span>Enter Stocks Mode</span>
+              <span>Enter Stock Market Terminal</span>
               <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
             </div>
           </div>
 
-          {/* Card 2: F&O Derivatives Mode */}
+          {/* Card 2: Futures and Options Derivatives Mode */}
           <div
             onClick={() => {
               playQuantumBeep(680, 0.04);
@@ -110,50 +111,51 @@ export const ModeSelectionModal: React.FC<ModeSelectionModalProps> = ({
                 <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/25 text-purple-400 flex items-center justify-center group-hover:scale-105 transition-transform">
                   <Layers className="w-5 h-5" />
                 </div>
-                <span className="text-[10px] font-mono-code px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 font-bold">
-                  QUANT & HEDGING
+                <span className="text-[10px] font-mono-code px-2.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 font-bold uppercase tracking-wider">
+                  Quantitative Analysis and Hedging
                 </span>
               </div>
 
               <div>
                 <h3 className="text-base font-bold font-heading text-white group-hover:text-purple-300 transition-colors">
-                  Futures & Options Mode
+                  Futures and Options Mode
                 </h3>
                 <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-                  Interactive multi-leg strategy architect, real-time SVG payoff curves, Black-Scholes Greeks lab, and NSE option chains.
+                  Interactive multi-leg strategy architect, real-time dynamic visual payoff curves, Black-Scholes Greeks laboratory, and National Stock Exchange option chains.
                 </p>
               </div>
 
-              <div className="space-y-1.5 pt-2 border-t border-white/[0.06] text-[11px] font-mono-code text-slate-400">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-purple-400">•</span>
-                  <span>Interactive payoff curve & breakevens</span>
+              {/* Feature Spans: First span is pure human-readable text with no special characters */}
+              <div className="space-y-2 pt-2.5 border-t border-white/[0.06] text-[11px] font-mono-code">
+                <div className="flex items-start gap-2">
+                  <span className="text-purple-400 font-bold shrink-0">Payoff</span>
+                  <span className="text-slate-300">Interactive payoff curve and breakeven boundaries</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-purple-400">•</span>
-                  <span>Full BSM Greeks ($\Delta, \Gamma, \theta, \nu$)</span>
+                <div className="flex items-start gap-2">
+                  <span className="text-purple-400 font-bold shrink-0">Sensitivity</span>
+                  <span className="text-slate-300">Full Black Scholes Merton Greeks Delta Gamma Theta Vega</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-purple-400">•</span>
-                  <span>AI microstructure & OI skew advisor</span>
+                <div className="flex items-start gap-2">
+                  <span className="text-purple-400 font-bold shrink-0">Advisory</span>
+                  <span className="text-slate-300">Artificial Intelligence microstructure and Open Interest skew advisory</span>
                 </div>
               </div>
             </div>
 
             <div className="mt-5 flex items-center justify-between pt-3 border-t border-white/[0.06] text-xs font-mono-code font-bold text-purple-400 group-hover:text-purple-300">
-              <span>Enter F&O Mode</span>
+              <span>Enter Futures and Options Mode</span>
               <ArrowRight className="w-4 h-4 transform group-hover:translate-x-1 transition-transform" />
             </div>
           </div>
         </div>
 
-        {/* Footer Notice */}
-        <div className="mt-6 pt-4 border-t border-white/[0.08] flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] font-mono-code text-slate-500">
+        {/* Footer Notice: Clean human-readable text without special characters or raw symbols */}
+        <div className="mt-6 pt-4 border-t border-white/[0.08] flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] font-mono-code text-slate-400">
           <div className="flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>You can switch between both modes anytime from the top bar</span>
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span>You can switch between both modes anytime from the top navigation bar</span>
           </div>
-          <span>FBIL FX: $1.00 = ₹{exchangeRate.toFixed(2)}</span>
+          <span>Reference Exchange Rate: One United States Dollar equals {exchangeRate.toFixed(2)} Indian Rupees</span>
         </div>
       </div>
     </div>
