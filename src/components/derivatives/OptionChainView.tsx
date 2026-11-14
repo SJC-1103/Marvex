@@ -1,37 +1,56 @@
-import React, { useState, useMemo } from 'react';
-import { Layers, ArrowUpDown, Filter, Sparkles, TrendingUp, TrendingDown } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Sparkles } from 'lucide-react';
 import { UnderlyingAsset, OptionChainRow } from '../../types/derivatives';
+import { Currency } from '../../types/market';
 import { calculateBlackScholes } from '../../utils/blackScholes';
 import { AiFoAnomalyDrawer } from '../modals/AiFoAnomalyDrawer';
 import { playQuantumBeep } from '../../utils/audio';
+import { formatCurrency } from '../../utils/currency';
 
 interface OptionChainViewProps {
   underlying: UnderlyingAsset;
+  underlyings?: UnderlyingAsset[];
+  onSelectUnderlying?: (underlying: UnderlyingAsset) => void;
+  currency: Currency;
+  exchangeRate: number;
   onSelectStrikeForLeg?: (strike: number, type: 'CALL' | 'PUT', position: 'BUY' | 'SELL') => void;
 }
 
 export const OptionChainView: React.FC<OptionChainViewProps> = ({
   underlying,
-  onSelectStrikeForLeg,
+  underlyings = [],
+  onSelectUnderlying,
+  currency,
+  exchangeRate,
 }) => {
   const [selectedExpiry, setSelectedExpiry] = useState<string>(underlying.activeExpiries[0]);
-  const [rangeSteps, setRangeSteps] = useState<number>(8); // strikes above and below ATM
+  const [rangeSteps] = useState<number>(8); // strikes above and below ATM
   const [isAiDrawerOpen, setIsAiDrawerOpen] = useState(false);
 
+  useEffect(() => {
+    setSelectedExpiry(underlying.activeExpiries[0]);
+  }, [underlying.symbol, underlying.activeExpiries]);
+
+  const fmt = (val: number, decimals = 2) =>
+    formatCurrency(val, currency, underlying.currency, exchangeRate, decimals);
+
+  const currSym = currency === 'INR' ? '₹' : '$';
+  const oneUnitLabel = formatCurrency(1, currency, underlying.currency, exchangeRate, currency === underlying.currency ? 0 : 2);
   const atmStrike = Math.round(underlying.spot / underlying.strikeInterval) * underlying.strikeInterval;
 
   // Generate Option Chain ladder
   const chainRows: OptionChainRow[] = useMemo(() => {
     const rows: OptionChainRow[] = [];
     const interval = underlying.strikeInterval;
+    const rate = underlying.country === 'US' ? 0.045 : 0.065;
 
     for (let i = -rangeSteps; i <= rangeSteps; i++) {
-      const strike = atmStrike + i * interval;
+      const strike = Number((atmStrike + i * interval).toFixed(2));
       const dte = 30; // standard 30-day DTE
       const distFromSpot = strike - underlying.spot;
 
       // Volatility skew smile: OTM Puts have higher IV, OTM Calls slightly lower IV
-      const skewAdjustment = distFromSpot < 0 ? Math.abs(distFromSpot / underlying.spot) * 15 : - (distFromSpot / underlying.spot) * 8;
+      const skewAdjustment = distFromSpot < 0 ? Math.abs(distFromSpot / underlying.spot) * 15 : -(distFromSpot / underlying.spot) * 8;
       const iv = Math.max(12, 22.5 + skewAdjustment);
 
       const bsm = calculateBlackScholes({
@@ -39,10 +58,11 @@ export const OptionChainView: React.FC<OptionChainViewProps> = ({
         strike,
         dte,
         volatility: iv,
+        rate,
       });
 
       // Synthetic OI & volume distributions around strikes
-      const oiBase = Math.max(1000, Math.round(25000 * Math.exp(-Math.pow(distFromSpot / 150, 2))));
+      const oiBase = Math.max(1000, Math.round(25000 * Math.exp(-Math.pow(distFromSpot / Math.max(20, underlying.spot * 0.05), 2))));
       const callOi = distFromSpot >= 0 ? Math.round(oiBase * 1.4) : Math.round(oiBase * 0.7);
       const putOi = distFromSpot <= 0 ? Math.round(oiBase * 1.5) : Math.round(oiBase * 0.6);
 
@@ -79,34 +99,40 @@ export const OptionChainView: React.FC<OptionChainViewProps> = ({
     }
 
     return rows;
-  }, [underlying.spot, underlying.strikeInterval, underlying.changePercent, atmStrike, rangeSteps]);
+  }, [underlying.spot, underlying.strikeInterval, underlying.changePercent, underlying.country, atmStrike, rangeSteps]);
 
   // Aggregate totals
   const totalCallOi = useMemo(() => chainRows.reduce((acc, r) => acc + r.call.oi, 0), [chainRows]);
   const totalPutOi = useMemo(() => chainRows.reduce((acc, r) => acc + r.put.oi, 0), [chainRows]);
   const pcr = totalCallOi > 0 ? (totalPutOi / totalCallOi).toFixed(2) : '1.00';
 
+  const gapAmount = Math.abs(underlying.spot - underlying.maxPain);
+
   return (
     <div className="space-y-4">
       {/* Top Chain Info Bar */}
       <div className="p-4 rounded-2xl bg-[#090d19] border border-white/[0.08] flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <span className="font-heading font-bold text-white text-base">
               {underlying.symbol} Option Chain Matrix
             </span>
             <span className="px-2 py-0.5 rounded-md bg-white/[0.06] border border-white/[0.1] text-sky-400 font-mono-code text-xs">
-              NSE Derivatives
+              {underlying.exchange} Derivatives
             </span>
           </div>
 
           <div className="flex items-center gap-3 text-xs font-mono-code text-slate-400">
             {/* Spot Hover with Formula */}
             <div className="relative group cursor-help">
-              <span className="border-b border-dotted border-white/30">Spot: <strong className="text-white">₹{underlying.spot}</strong></span>
+              <span className="border-b border-dotted border-white/30">
+                Spot: <strong className="text-white">{fmt(underlying.spot)}</strong>
+              </span>
               <div className="absolute left-0 top-full mt-2 hidden group-hover:block z-50 w-72 p-3 rounded-xl bg-[#0c1222] border border-sky-500/30 shadow-2xl text-left pointer-events-none">
                 <div className="text-[11px] font-bold text-sky-300 font-heading">Underlying Cash Spot Price (S)</div>
-                <div className="text-[10px] text-slate-300 mt-1">Live NSE real-time cash equity reference price for derivative contract settlement.</div>
+                <div className="text-[10px] text-slate-300 mt-1">
+                  Live {underlying.exchange} cash equity reference price for derivative contract settlement.
+                </div>
                 <div className="mt-2 p-1.5 rounded bg-black/60 border border-white/[0.08] text-[9px] font-mono-code text-sky-400">
                   Moneyness: {underlying.spot > underlying.maxPain ? 'Trading Above Max Pain' : 'Trading Below Max Pain'}
                 </div>
@@ -116,7 +142,9 @@ export const OptionChainView: React.FC<OptionChainViewProps> = ({
 
             {/* Max Pain Hover with Formula & Criteria */}
             <div className="relative group cursor-help">
-              <span className="border-b border-dotted border-amber-400/50">Max Pain: <strong className="text-amber-400">₹{underlying.maxPain}</strong></span>
+              <span className="border-b border-dotted border-amber-400/50">
+                Max Pain: <strong className="text-amber-400">{fmt(underlying.maxPain)}</strong>
+              </span>
               <div className="absolute left-0 top-full mt-2 hidden group-hover:block z-50 w-80 p-3.5 rounded-xl bg-[#0c1222] border border-amber-500/30 shadow-2xl text-left pointer-events-none">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-amber-300 font-heading">Max Pain Strike (K*)</span>
@@ -130,7 +158,12 @@ export const OptionChainView: React.FC<OptionChainViewProps> = ({
                 </div>
                 <div className="text-[9px] text-slate-400 space-y-0.5">
                   <div>• <strong>Theoretical Criteria:</strong> Option sellers (institutions) gravitate spot toward K* to expire maximum contracts worthless.</div>
-                  <div>• <strong>Current Gap:</strong> {underlying.spot - underlying.maxPain > 0 ? `+₹${(underlying.spot - underlying.maxPain).toFixed(2)} above strike` : `-₹${Math.abs(underlying.spot - underlying.maxPain).toFixed(2)} below strike`}.</div>
+                  <div>
+                    • <strong>Current Gap:</strong>{' '}
+                    {underlying.spot - underlying.maxPain >= 0
+                      ? `+${fmt(gapAmount)} above strike`
+                      : `-${fmt(gapAmount)} below strike`}.
+                  </div>
                 </div>
               </div>
             </div>
@@ -170,8 +203,25 @@ export const OptionChainView: React.FC<OptionChainViewProps> = ({
           </div>
         </div>
 
-        {/* Expiry Selector & AI Audit Button */}
-        <div className="flex items-center gap-3">
+        {/* Underlying Switcher, Expiry Selector & AI Audit Button */}
+        <div className="flex flex-wrap items-center gap-3">
+          {underlyings.length > 0 && onSelectUnderlying && (
+            <select
+              value={underlying.symbol}
+              onChange={e => {
+                const match = underlyings.find(u => u.symbol === e.target.value);
+                if (match) onSelectUnderlying(match);
+              }}
+              className="bg-black/60 border border-white/[0.12] rounded-xl px-3 py-1.5 text-xs font-mono-code font-bold text-white"
+            >
+              {underlyings.map(u => (
+                <option key={u.symbol} value={u.symbol}>
+                  {u.symbol} ({u.exchange}) — {formatCurrency(u.spot, currency, u.currency, exchangeRate)}
+                </option>
+              ))}
+            </select>
+          )}
+
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono-code text-slate-400 uppercase">Expiry:</span>
             <select
@@ -210,7 +260,7 @@ export const OptionChainView: React.FC<OptionChainViewProps> = ({
                   CALL OPTIONS (CE)
                 </th>
                 <th className="py-2 text-amber-300 font-bold uppercase tracking-wider font-heading text-xs px-4">
-                  STRIKE
+                  STRIKE ({currency})
                 </th>
                 <th colSpan={5} className="py-2 text-rose-400 border-l border-white/[0.08] uppercase tracking-wider font-heading text-xs">
                   PUT OPTIONS (PE)
@@ -233,7 +283,7 @@ export const OptionChainView: React.FC<OptionChainViewProps> = ({
                 <th className="py-2 px-2 group relative cursor-help" title="Delta (∂V/∂S)">
                   <span className="border-b border-dotted border-white/20">Delta (Δ)</span>
                   <div className="absolute left-0 top-full hidden group-hover:block z-40 w-64 p-2 rounded-lg bg-[#0e1424] border border-white/10 text-left text-[10px] text-slate-300 font-sans">
-                    <strong className="text-sky-300">Delta Δ = N(d₁)</strong>: Change in call option price for every ₹1 change in underlying spot. Ranges from 0.00 to +1.00.
+                    <strong className="text-sky-300">Delta Δ = N(d₁)</strong>: Change in call option price for every {oneUnitLabel} change in underlying spot. Ranges from 0.00 to +1.00.
                   </div>
                 </th>
                 <th className="py-2 px-2 group relative cursor-help" title="Theta (-∂V/∂t)">
@@ -243,7 +293,7 @@ export const OptionChainView: React.FC<OptionChainViewProps> = ({
                   </div>
                 </th>
                 <th className="py-2 px-2 border-r border-white/[0.08] font-bold text-slate-200 group relative cursor-help">
-                  <span className="border-b border-dotted border-emerald-400/40">LTP (₹)</span>
+                  <span className="border-b border-dotted border-emerald-400/40">LTP ({currSym})</span>
                   <div className="absolute right-0 top-full hidden group-hover:block z-40 w-60 p-2 rounded-lg bg-[#0e1424] border border-emerald-500/20 text-left text-[10px] text-slate-300 font-sans">
                     <strong className="text-emerald-300">Last Traded Price</strong>: BSM formula: C = S·N(d₁) - K·e^(-rT)·N(d₂).
                   </div>
@@ -251,11 +301,11 @@ export const OptionChainView: React.FC<OptionChainViewProps> = ({
                 <th className="py-2 px-3 text-white font-bold bg-white/[0.04] group relative cursor-help">
                   <span className="border-b border-dotted border-amber-300/40">Strike (K)</span>
                   <div className="absolute left-1/2 -translate-x-1/2 top-full hidden group-hover:block z-40 w-52 p-2 rounded-lg bg-[#0e1424] border border-amber-400/20 text-left text-[10px] text-slate-300 font-sans">
-                    <strong>Strike Price (K)</strong>: Predetermined contract exercise price. ATM = closest to Spot ₹{underlying.spot}.
+                    <strong>Strike Price (K)</strong>: Predetermined contract exercise price. ATM = closest to Spot {fmt(underlying.spot)}.
                   </div>
                 </th>
                 <th className="py-2 px-2 border-l border-white/[0.08] font-bold text-slate-200 group relative cursor-help">
-                  <span className="border-b border-dotted border-rose-400/40">LTP (₹)</span>
+                  <span className="border-b border-dotted border-rose-400/40">LTP ({currSym})</span>
                   <div className="absolute left-0 top-full hidden group-hover:block z-40 w-60 p-2 rounded-lg bg-[#0e1424] border border-rose-500/20 text-left text-[10px] text-slate-300 font-sans">
                     <strong className="text-rose-300">Put LTP</strong>: BSM formula: P = K·e^(-rT)·N(-d₂) - S·N(-d₁).
                   </div>
@@ -291,6 +341,7 @@ export const OptionChainView: React.FC<OptionChainViewProps> = ({
                 const isAtm = row.strike === atmStrike;
                 const isCallItm = row.strike < underlying.spot;
                 const isPutItm = row.strike > underlying.spot;
+                const strikeDecimals = currency === underlying.currency && row.strike % 1 === 0 ? 0 : 2;
 
                 return (
                   <tr
@@ -311,18 +362,18 @@ export const OptionChainView: React.FC<OptionChainViewProps> = ({
                     </td>
                     {/* Call Theta */}
                     <td className={`py-2 px-2 ${isCallItm ? 'bg-emerald-500/[0.04]' : ''} text-rose-300 text-[10px]`}>
-                      -₹{Math.abs(row.call.greeks.theta)}
+                      -{fmt(Math.abs(row.call.greeks.theta))}
                     </td>
                     {/* Call LTP */}
                     <td className={`py-2 px-2 border-r border-white/[0.08] ${isCallItm ? 'bg-emerald-500/[0.08]' : ''} font-bold text-emerald-400`}>
-                      ₹{row.call.ltp.toFixed(2)}
+                      {fmt(row.call.ltp)}
                     </td>
 
                     {/* STRIKE */}
                     <td className="py-2 px-3 font-bold text-white bg-white/[0.04] relative">
-                      {row.strike.toLocaleString()}
+                      {fmt(row.strike, strikeDecimals)}
                       {isAtm && (
-                        <span className="absolute right-1 top-1 text-[8px] px-1 rounded bg-amber-400 text-black font-extrabold">
+                        <span className="ml-1.5 text-[8px] px-1 rounded bg-amber-400 text-black font-extrabold">
                           ATM
                         </span>
                       )}
@@ -330,11 +381,11 @@ export const OptionChainView: React.FC<OptionChainViewProps> = ({
 
                     {/* Put LTP */}
                     <td className={`py-2 px-2 border-l border-white/[0.08] ${isPutItm ? 'bg-rose-500/[0.08]' : ''} font-bold text-rose-400`}>
-                      ₹{row.put.ltp.toFixed(2)}
+                      {fmt(row.put.ltp)}
                     </td>
                     {/* Put Theta */}
                     <td className={`py-2 px-2 ${isPutItm ? 'bg-rose-500/[0.04]' : ''} text-rose-300 text-[10px]`}>
-                      -₹{Math.abs(row.put.greeks.theta)}
+                      -{fmt(Math.abs(row.put.greeks.theta))}
                     </td>
                     {/* Put Delta */}
                     <td className={`py-2 px-2 ${isPutItm ? 'bg-rose-500/[0.04]' : ''} text-slate-300`}>
@@ -361,6 +412,8 @@ export const OptionChainView: React.FC<OptionChainViewProps> = ({
         isOpen={isAiDrawerOpen}
         onClose={() => setIsAiDrawerOpen(false)}
         underlying={underlying}
+        currency={currency}
+        exchangeRate={exchangeRate}
       />
     </div>
   );

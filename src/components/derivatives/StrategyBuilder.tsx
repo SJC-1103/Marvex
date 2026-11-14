@@ -1,21 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Layers,
   Plus,
   Trash2,
-  TrendingUp,
-  TrendingDown,
   Sparkles,
   Sliders,
   RotateCcw,
-  ShieldCheck,
-  Compass,
-  AlertTriangle,
-  Info,
-  ChevronDown,
 } from 'lucide-react';
-import { UnderlyingAsset, StrategyLeg, OptionType, PositionType, ContractPeriodType } from '../../types/derivatives';
-import { MOCK_UNDERLYINGS, STRATEGY_BLUEPRINTS, CONTRACT_PERIODS } from '../../data/derivativesData';
+import { UnderlyingAsset, StrategyLeg, OptionType, ContractPeriodType } from '../../types/derivatives';
+import { Currency } from '../../types/market';
+import { STRATEGY_BLUEPRINTS, CONTRACT_PERIODS } from '../../data/derivativesData';
 import { calculateStrategyPayoff } from '../../utils/payoffSimulator';
 import { calculateBlackScholes } from '../../utils/blackScholes';
 import { PayoffChart } from './PayoffChart';
@@ -24,20 +18,35 @@ import { formatCurrency } from '../../utils/currency';
 
 interface StrategyBuilderProps {
   selectedUnderlying: UnderlyingAsset;
+  underlyings: UnderlyingAsset[];
   onSelectUnderlying: (underlying: UnderlyingAsset) => void;
+  currency: Currency;
+  exchangeRate: number;
 }
 
 export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
   selectedUnderlying,
+  underlyings,
   onSelectUnderlying,
+  currency,
+  exchangeRate,
 }) => {
   const [selectedPeriod, setSelectedPeriod] = useState<ContractPeriodType>('1M');
   const [targetDteOffset, setTargetDteOffset] = useState<number>(0);
   const [ivShift, setIvShift] = useState<number>(0);
+  const [marketFilter, setMarketFilter] = useState<'ALL' | 'IN' | 'US'>('ALL');
   const [isAiDrawerOpen, setIsAiDrawerOpen] = useState<boolean>(false);
   const [bannerNotice, setBannerNotice] = useState<string | null>(null);
 
   const activePeriodInfo = CONTRACT_PERIODS.find(p => p.id === selectedPeriod) || CONTRACT_PERIODS[2];
+
+  const fmt = (val: number, decimals = 2) =>
+    formatCurrency(val, currency, selectedUnderlying.currency, exchangeRate, decimals);
+
+  const filteredUnderlyings = useMemo(() => {
+    if (marketFilter === 'ALL') return underlyings;
+    return underlyings.filter(u => u.country === marketFilter);
+  }, [underlyings, marketFilter]);
 
   // Initialize legs with a default Bull Call Spread
   const [legs, setLegs] = useState<StrategyLeg[]>(() => {
@@ -52,6 +61,32 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
     );
     return initialLegs.map((l, idx) => ({ ...l, id: `leg-${Date.now()}-${idx}` }));
   });
+
+  // Re-anchor legs if selectedUnderlying changes externally (e.g. from Audit tab)
+  const prevSymbolRef = useRef<string>(selectedUnderlying.symbol);
+  useEffect(() => {
+    if (prevSymbolRef.current !== selectedUnderlying.symbol) {
+      prevSymbolRef.current = selectedUnderlying.symbol;
+      const bp = STRATEGY_BLUEPRINTS[0];
+      const nextLegs = bp.buildLegs(
+        selectedUnderlying.spot,
+        selectedUnderlying.strikeInterval,
+        selectedUnderlying.lotSize,
+        selectedUnderlying.activeExpiries[0],
+        activePeriodInfo.dte,
+        activePeriodInfo.typicalIv
+      );
+      setLegs(nextLegs.map((l, idx) => ({ ...l, id: `leg-${Date.now()}-${idx}` })));
+    }
+  }, [
+    selectedUnderlying.symbol,
+    selectedUnderlying.spot,
+    selectedUnderlying.strikeInterval,
+    selectedUnderlying.lotSize,
+    selectedUnderlying.activeExpiries,
+    activePeriodInfo.dte,
+    activePeriodInfo.typicalIv,
+  ]);
 
   // Calculate Payoff Summary
   const payoffSummary = useMemo(() => {
@@ -105,6 +140,7 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
             strike: updated.strike,
             dte: updated.dte,
             volatility: updated.iv,
+            rate: selectedUnderlying.country === 'US' ? 0.045 : 0.065,
           });
           const price = updated.type === 'CALL' ? bsm.callPrice : bsm.putPrice;
           return { ...updated, entryPrice: price, currentPrice: price };
@@ -122,6 +158,7 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
       strike: atmStrike,
       dte: activePeriodInfo.dte,
       volatility: activePeriodInfo.typicalIv,
+      rate: selectedUnderlying.country === 'US' ? 0.045 : 0.065,
     });
 
     const newLeg: StrategyLeg = {
@@ -142,6 +179,8 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
     setLegs(prev => [...prev, newLeg]);
   };
 
+  const oneUnitLabel = formatCurrency(1, currency, selectedUnderlying.currency, exchangeRate, currency === selectedUnderlying.currency ? 0 : 2);
+
   return (
     <div className="space-y-6">
       {/* Top Banner Notice */}
@@ -155,71 +194,106 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
         </div>
       )}
 
-      {/* Control Bar: Underlying Selector + Contract Period Selector + AI Button */}
-      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.08] flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        {/* Underlying Asset Selector */}
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-xs font-mono-code text-slate-400 uppercase tracking-wider">Underlying:</span>
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-            {MOCK_UNDERLYINGS.map(und => {
-              const isSelected = und.symbol === selectedUnderlying.symbol;
-              return (
+      {/* Control Bar: Market Filter + Underlying Selector + Contract Period Selector + AI Button */}
+      <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/[0.08] space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          {/* Market Region Filter & Quick Underlying Dropdown */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="text-xs font-mono-code text-slate-400 uppercase tracking-wider">Underlying:</span>
+            <div className="flex items-center gap-1 p-1 rounded-xl bg-black/40 border border-white/[0.08]">
+              {([
+                { id: 'ALL', label: `All (${underlyings.length})` },
+                { id: 'IN', label: `Indian NSE (${underlyings.filter(u => u.country === 'IN').length})` },
+                { id: 'US', label: `US NASDAQ (${underlyings.filter(u => u.country === 'US').length})` },
+              ] as const).map(f => (
                 <button
-                  key={und.symbol}
-                  onClick={() => {
-                    onSelectUnderlying(und);
-                    // auto re-anchor legs
-                    const bp = STRATEGY_BLUEPRINTS[0];
-                    const nextLegs = bp.buildLegs(und.spot, und.strikeInterval, und.lotSize, und.activeExpiries[0], activePeriodInfo.dte, activePeriodInfo.typicalIv);
-                    setLegs(nextLegs.map((l, idx) => ({ ...l, id: `leg-${Date.now()}-${idx}` })));
-                  }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-mono-code font-bold transition flex items-center gap-1.5 ${
-                    isSelected
-                      ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm'
-                      : 'bg-white/[0.03] text-slate-400 hover:text-white border border-white/[0.06]'
+                  key={f.id}
+                  onClick={() => setMarketFilter(f.id)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-mono-code font-bold transition ${
+                    marketFilter === f.id
+                      ? 'bg-sky-500/25 text-sky-300 border border-sky-500/30'
+                      : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  <span>{und.symbol}</span>
-                  <span className={und.changePercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
-                    {und.changePercent >= 0 ? '+' : ''}{und.changePercent}%
-                  </span>
+                  {f.label}
                 </button>
-              );
-            })}
+              ))}
+            </div>
+
+            <select
+              value={selectedUnderlying.symbol}
+              onChange={e => {
+                const found = underlyings.find(u => u.symbol === e.target.value);
+                if (found) onSelectUnderlying(found);
+              }}
+              className="bg-[#0b101e] border border-white/[0.12] rounded-xl px-3 py-1.5 text-xs font-mono-code font-bold text-white focus:outline-none focus:border-sky-500"
+            >
+              {filteredUnderlyings.map(und => (
+                <option key={und.symbol} value={und.symbol}>
+                  {und.symbol} ({und.exchange}) — {formatCurrency(und.spot, currency, und.currency, exchangeRate)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Contract Expiry Horizon Selector */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-mono-code text-slate-400 uppercase tracking-wider">Horizon:</span>
+            <div className="flex items-center gap-1 p-1 rounded-xl bg-black/40 border border-white/[0.08]">
+              {CONTRACT_PERIODS.map(period => (
+                <button
+                  key={period.id}
+                  onClick={() => {
+                    setSelectedPeriod(period.id);
+                    setLegs(prev => prev.map(l => ({ ...l, dte: period.dte, iv: period.typicalIv })));
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-mono-code font-bold transition ${
+                    selectedPeriod === period.id
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title={period.description}
+                >
+                  {period.id}
+                </button>
+              ))}
+            </div>
+
+            {/* AI Advisor Button */}
+            <button
+              onClick={() => setIsAiDrawerOpen(true)}
+              className="px-3.5 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 font-mono-code text-xs font-bold transition flex items-center gap-1.5"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>AI F&O Advisor</span>
+            </button>
           </div>
         </div>
 
-        {/* Contract Expiry Horizon Selector */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-mono-code text-slate-400 uppercase tracking-wider">Horizon:</span>
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-black/40 border border-white/[0.08]">
-            {CONTRACT_PERIODS.map(period => (
+        {/* Scrollable Quick Select Chips with Live Converted Spot Prices */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+          {filteredUnderlyings.map(und => {
+            const isSelected = und.symbol === selectedUnderlying.symbol;
+            return (
               <button
-                key={period.id}
-                onClick={() => {
-                  setSelectedPeriod(period.id);
-                  setLegs(prev => prev.map(l => ({ ...l, dte: period.dte, iv: period.typicalIv })));
-                }}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-mono-code font-bold transition ${
-                  selectedPeriod === period.id
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white'
+                key={und.symbol}
+                onClick={() => onSelectUnderlying(und)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono-code font-bold transition flex items-center gap-2 whitespace-nowrap shrink-0 ${
+                  isSelected
+                    ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 shadow-sm'
+                    : 'bg-white/[0.03] text-slate-400 hover:text-white border border-white/[0.06]'
                 }`}
-                title={period.description}
               >
-                {period.id}
+                <span>{und.symbol}</span>
+                <span className="text-slate-200 font-normal">
+                  {formatCurrency(und.spot, currency, und.currency, exchangeRate)}
+                </span>
+                <span className={und.changePercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                  {und.changePercent >= 0 ? '+' : ''}{und.changePercent}%
+                </span>
               </button>
-            ))}
-          </div>
-
-          {/* AI Advisor Button */}
-          <button
-            onClick={() => setIsAiDrawerOpen(true)}
-            className="px-3.5 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 font-mono-code text-xs font-bold transition flex items-center gap-1.5"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>AI F&O Advisor</span>
-          </button>
+            );
+          })}
         </div>
       </div>
 
@@ -232,6 +306,8 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
             spotPrice={selectedUnderlying.spot}
             underlying={selectedUnderlying}
             legs={legs}
+            currency={currency}
+            exchangeRate={exchangeRate}
           />
 
           {/* Interactive Simulation Sliders (Target DTE & IV Shift) with Calculation Details */}
@@ -321,8 +397,8 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
           <div className="p-4 rounded-2xl bg-black/40 border border-white/[0.08] space-y-3.5">
             <h3 className="text-xs font-heading font-bold text-white uppercase tracking-wider flex items-center justify-between">
               <span>Risk & Reward Matrix</span>
-              <span className="text-[10px] font-mono-code text-slate-400">
-                {selectedUnderlying.currency}
+              <span className="text-[10px] font-mono-code text-sky-400">
+                {currency} {currency !== selectedUnderlying.currency ? `(from ${selectedUnderlying.currency})` : ''}
               </span>
             </h3>
 
@@ -330,7 +406,8 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
             <div className="group relative cursor-help flex items-center justify-between text-xs font-mono-code border-b border-white/[0.06] pb-2">
               <span className="text-slate-400 border-b border-dotted border-white/20">Net Outlay / Cashflow</span>
               <span className={`font-bold ${payoffSummary.netCostOrCredit >= 0 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {payoffSummary.netCostOrCredit >= 0 ? 'Credit +' : 'Debit -'}₹{Math.abs(payoffSummary.netCostOrCredit).toLocaleString()}
+                {payoffSummary.netCostOrCredit >= 0 ? 'Credit +' : 'Debit -'}
+                {fmt(Math.abs(payoffSummary.netCostOrCredit))}
               </span>
               <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-50 w-72 p-2.5 rounded-xl bg-[#0c1222] border border-white/10 shadow-2xl text-[10px] text-slate-300 pointer-events-none">
                 <strong>Formula:</strong> ∑ (Lots_i · LotSize · Premium_i · Direction_i)
@@ -342,7 +419,7 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
             <div className="group relative cursor-help flex items-center justify-between text-xs font-mono-code border-b border-white/[0.06] pb-2">
               <span className="text-slate-400 border-b border-dotted border-emerald-400/30">Max Profit</span>
               <span className="font-bold text-emerald-400">
-                {payoffSummary.maxProfit === 'UNLIMITED' ? 'UNLIMITED' : `+₹${payoffSummary.maxProfit.toLocaleString()}`}
+                {payoffSummary.maxProfit === 'UNLIMITED' ? 'UNLIMITED' : `+${fmt(payoffSummary.maxProfit)}`}
               </span>
               <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-50 w-72 p-2.5 rounded-xl bg-[#0c1222] border border-emerald-500/20 shadow-2xl text-[10px] text-slate-300 pointer-events-none">
                 <strong>Terminal Ceiling:</strong> Max bound of piecewise payoff function across S_T ∈ [0, ∞). Defined risk spreads cap upside at strike difference minus net debit.
@@ -353,7 +430,7 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
             <div className="group relative cursor-help flex items-center justify-between text-xs font-mono-code border-b border-white/[0.06] pb-2">
               <span className="text-slate-400 border-b border-dotted border-rose-400/30">Max Loss</span>
               <span className="font-bold text-rose-400">
-                {payoffSummary.maxLoss === 'UNLIMITED' ? 'UNLIMITED' : `-₹${Math.abs(payoffSummary.maxLoss).toLocaleString()}`}
+                {payoffSummary.maxLoss === 'UNLIMITED' ? 'UNLIMITED' : `-${fmt(Math.abs(payoffSummary.maxLoss))}`}
               </span>
               <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-50 w-72 p-2.5 rounded-xl bg-[#0c1222] border border-rose-500/20 shadow-2xl text-[10px] text-slate-300 pointer-events-none">
                 <strong>Worst-Case Risk:</strong> Maximum drawdown at expiration. Defined risk structures ensure loss cannot exceed net premium or spread width.
@@ -399,13 +476,13 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
                 <div className="text-[10px] text-slate-400 border-b border-dotted border-white/20 inline-block">Gamma (Γ)</div>
                 <div className="font-bold text-sky-400">{payoffSummary.netGreeks.gamma}</div>
                 <div className="absolute right-0 top-full mt-1 hidden group-hover:block z-50 w-60 p-2 rounded-xl bg-[#0c1222] border border-white/10 text-[9px] text-slate-300 pointer-events-none">
-                  Curvature risk: Rate of delta change per ₹1 move in spot.
+                  Curvature risk: Rate of delta change per {oneUnitLabel} move in spot.
                 </div>
               </div>
               <div className="p-2 rounded-xl bg-white/[0.02] border border-white/[0.06] group relative cursor-help">
                 <div className="text-[10px] text-slate-400 border-b border-dotted border-white/20 inline-block">Theta (θ / day)</div>
                 <div className={`font-bold ${payoffSummary.netGreeks.theta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {payoffSummary.netGreeks.theta >= 0 ? '+' : ''}₹{payoffSummary.netGreeks.theta}
+                  {payoffSummary.netGreeks.theta >= 0 ? '+' : '-'}{fmt(Math.abs(payoffSummary.netGreeks.theta))}
                 </div>
                 <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-50 w-60 p-2 rounded-xl bg-[#0c1222] border border-white/10 text-[9px] text-slate-300 pointer-events-none">
                   Portfolio daily cashflow accrual or loss from passage of 1 trading day.
@@ -413,7 +490,9 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
               </div>
               <div className="p-2 rounded-xl bg-white/[0.02] border border-white/[0.06] group relative cursor-help">
                 <div className="text-[10px] text-slate-400 border-b border-dotted border-white/20 inline-block">Vega (ν / 1% IV)</div>
-                <div className="font-bold text-purple-400">₹{payoffSummary.netGreeks.vega}</div>
+                <div className="font-bold text-purple-400">
+                  {payoffSummary.netGreeks.vega >= 0 ? '' : '-'}{fmt(Math.abs(payoffSummary.netGreeks.vega))}
+                </div>
                 <div className="absolute right-0 top-full mt-1 hidden group-hover:block z-50 w-60 p-2 rounded-xl bg-[#0c1222] border border-white/10 text-[9px] text-slate-300 pointer-events-none">
                   Portfolio P&L sensitivity for every 1.0% shift in implied volatility.
                 </div>
@@ -452,7 +531,7 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-sky-400" />
             <h3 className="text-xs font-heading font-bold text-white uppercase tracking-wider">
-              Strategy Position Legs ({legs.length}/4)
+              Strategy Position Legs ({legs.length}/4) — Lot Size: {selectedUnderlying.lotSize} shares
             </h3>
           </div>
           <button
@@ -472,10 +551,10 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
                 <th className="py-2.5 px-3">Active</th>
                 <th className="py-2.5 px-3">Position</th>
                 <th className="py-2.5 px-3">Type</th>
-                <th className="py-2.5 px-3">Strike</th>
+                <th className="py-2.5 px-3">Strike ({selectedUnderlying.currency})</th>
                 <th className="py-2.5 px-3">Expiry / DTE</th>
                 <th className="py-2.5 px-3">Lots</th>
-                <th className="py-2.5 px-3">Entry Premium</th>
+                <th className="py-2.5 px-3">Entry Premium ({currency})</th>
                 <th className="py-2.5 px-3">IV</th>
                 <th className="py-2.5 px-3 text-right">Action</th>
               </tr>
@@ -530,15 +609,22 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
                   {/* Strike Selector */}
                   <td className="py-2.5 px-3">
                     {leg.instrument === 'FUTURE' ? (
-                      <span className="text-slate-400">Spot ({selectedUnderlying.spot})</span>
+                      <span className="text-slate-300">Spot ({fmt(selectedUnderlying.spot)})</span>
                     ) : (
-                      <input
-                        type="number"
-                        step={selectedUnderlying.strikeInterval}
-                        value={leg.strike}
-                        onChange={e => handleUpdateLeg(leg.id, { strike: parseFloat(e.target.value) || selectedUnderlying.spot })}
-                        className="w-24 bg-[#0b101e] border border-white/[0.1] rounded px-2 py-1 text-white font-bold"
-                      />
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          step={selectedUnderlying.strikeInterval}
+                          value={leg.strike}
+                          onChange={e => handleUpdateLeg(leg.id, { strike: parseFloat(e.target.value) || selectedUnderlying.spot })}
+                          className="w-24 bg-[#0b101e] border border-white/[0.1] rounded px-2 py-1 text-white font-bold"
+                        />
+                        {currency !== selectedUnderlying.currency && (
+                          <span className="text-[10px] text-sky-400 whitespace-nowrap">
+                            ≈ {fmt(leg.strike)}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </td>
 
@@ -562,7 +648,7 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
 
                   {/* Entry Premium */}
                   <td className="py-2.5 px-3 font-bold text-white">
-                    ₹{leg.entryPrice.toLocaleString()}
+                    {fmt(leg.entryPrice)}
                   </td>
 
                   {/* IV */}
@@ -591,6 +677,8 @@ export const StrategyBuilder: React.FC<StrategyBuilderProps> = ({
         isOpen={isAiDrawerOpen}
         onClose={() => setIsAiDrawerOpen(false)}
         underlying={selectedUnderlying}
+        currency={currency}
+        exchangeRate={exchangeRate}
         onLoadStrategy={stratName => {
           if (stratName.toLowerCase().includes('put')) {
             handleApplyBlueprint('bear-put-spread');

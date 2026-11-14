@@ -17,8 +17,12 @@ import {
 import { Stock, MarketIndex, Currency } from '../../types/market';
 import { PortfolioBook, PortfolioHolding } from '../../types/portfolio';
 import { ShareholdingPattern, StockContradiction } from '../../types/divergence';
-import { calculatePortfolioShareholding, calculateMarketDivergence } from '../../utils/analytics';
-import { formatCurrency } from '../../utils/currency';
+import {
+  calculatePortfolioShareholding,
+  calculateIndianUniverseShareholding,
+  calculateMarketDivergence,
+} from '../../utils/analytics';
+import { formatCompactFinancial, formatCurrency } from '../../utils/currency';
 
 interface OwnershipWorkspaceProps {
   currentBook: PortfolioBook;
@@ -39,8 +43,8 @@ export const OwnershipWorkspace: React.FC<OwnershipWorkspaceProps> = ({
   onInvestigateAnomaly,
   onNavigateToStock,
 }) => {
-  // Mode toggle: 'PORTFOLIO' vs 'STOCK'
-  const [viewMode, setViewMode] = useState<'PORTFOLIO' | 'STOCK'>('PORTFOLIO');
+  // Mode toggle: 'PORTFOLIO' vs 'INDIA_AGGREGATE' vs 'STOCK'
+  const [viewMode, setViewMode] = useState<'PORTFOLIO' | 'INDIA_AGGREGATE' | 'STOCK'>('PORTFOLIO');
   
   // Benchmark selection for market divergence comparison
   const [selectedBenchmarkId, setSelectedBenchmarkId] = useState<string>(() => {
@@ -71,6 +75,11 @@ export const OwnershipWorkspace: React.FC<OwnershipWorkspaceProps> = ({
     return calculatePortfolioShareholding(currentBook.holdings, availableStocks);
   }, [currentBook.holdings, availableStocks]);
 
+  // Aggregate Indian NSE universe shareholding calculation
+  const indianOwnershipData = useMemo(() => {
+    return calculateIndianUniverseShareholding(availableStocks);
+  }, [availableStocks]);
+
   // Specific stock shareholding calculation
   const selectedStock = useMemo(() => {
     return availableStocks.find(s => s.id === selectedStockId) || availableStocks[0];
@@ -81,6 +90,9 @@ export const OwnershipWorkspace: React.FC<OwnershipWorkspaceProps> = ({
     if (viewMode === 'PORTFOLIO') {
       return portfolioOwnershipData.shareholding;
     }
+    if (viewMode === 'INDIA_AGGREGATE') {
+      return indianOwnershipData.shareholding;
+    }
     return (
       selectedStock?.shareholding || {
         promotersPercent: 50.0,
@@ -90,7 +102,7 @@ export const OwnershipWorkspace: React.FC<OwnershipWorkspaceProps> = ({
         majorityHolder: 'PROMOTERS',
       }
     );
-  }, [viewMode, portfolioOwnershipData, selectedStock]);
+  }, [viewMode, portfolioOwnershipData, indianOwnershipData, selectedStock]);
 
   // Market Divergence Diagnostic
   const divergenceDiagnostic = useMemo(() => {
@@ -283,8 +295,8 @@ export const OwnershipWorkspace: React.FC<OwnershipWorkspaceProps> = ({
           </div>
 
           {/* View Mode Toggle */}
-          <div className="flex items-center gap-2">
-            <div className="p-1 rounded-xl bg-black/60 border border-white/10 flex items-center">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="p-1 rounded-xl bg-black/60 border border-white/10 flex flex-wrap items-center gap-1">
               <button
                 onClick={() => setViewMode('PORTFOLIO')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-mono-code font-semibold transition ${
@@ -294,6 +306,16 @@ export const OwnershipWorkspace: React.FC<OwnershipWorkspaceProps> = ({
                 }`}
               >
                 Entire Portfolio Aggregate
+              </button>
+              <button
+                onClick={() => setViewMode('INDIA_AGGREGATE')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono-code font-semibold transition ${
+                  viewMode === 'INDIA_AGGREGATE'
+                    ? 'bg-sky-500 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Indian NSE Aggregate ({indianOwnershipData.indianStocks.length})
               </button>
               <button
                 onClick={() => setViewMode('STOCK')}
@@ -316,7 +338,7 @@ export const OwnershipWorkspace: React.FC<OwnershipWorkspaceProps> = ({
               >
                 {availableStocks.map(stock => (
                   <option key={stock.id} value={stock.id}>
-                    {stock.symbol} — {stock.name}
+                    {stock.symbol} ({stock.exchange}) — {stock.name}
                   </option>
                 ))}
               </select>
@@ -353,6 +375,8 @@ export const OwnershipWorkspace: React.FC<OwnershipWorkspaceProps> = ({
             <div className="text-[10px] text-slate-500 font-mono-code mt-0.5">
               {viewMode === 'PORTFOLIO'
                 ? `Weighted across ${portfolioOwnershipData.evaluatedPositionsCount} portfolio equities`
+                : viewMode === 'INDIA_AGGREGATE'
+                ? `Market-cap weighted (${formatCompactFinancial(indianOwnershipData.totalMarketCapInr, currency, 'INR', exchangeRate)} combined)`
                 : `${selectedStock.exchange} Bhavcopy / Regulatory Filing`}
             </div>
           </div>
@@ -476,6 +500,93 @@ export const OwnershipWorkspace: React.FC<OwnershipWorkspaceProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Indian NSE Companies Shareholding Matrix (Visible in Indian NSE Aggregate mode) */}
+        {viewMode === 'INDIA_AGGREGATE' && (
+          <div className="pt-4 border-t border-white/[0.06] space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-heading font-bold text-white uppercase tracking-wider">
+                Tracked Indian NSE Companies Ownership Matrix ({indianOwnershipData.indianStocks.length} F&O Equities)
+              </h3>
+              <span className="text-[11px] font-mono-code text-slate-400">
+                Click any company to inspect or analyze
+              </span>
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-black/40">
+              <table className="w-full text-left text-xs font-mono-code">
+                <thead className="bg-white/[0.02] text-slate-400 border-b border-white/[0.06]">
+                  <tr>
+                    <th className="py-2.5 px-3">Symbol</th>
+                    <th className="py-2.5 px-3">Price</th>
+                    <th className="py-2.5 px-3">Market Cap</th>
+                    <th className="py-2.5 px-3">Promoters</th>
+                    <th className="py-2.5 px-3">Institutions (FII / DII)</th>
+                    <th className="py-2.5 px-3">Public</th>
+                    <th className="py-2.5 px-3">Pledged</th>
+                    <th className="py-2.5 px-3">Majority Holder</th>
+                    <th className="py-2.5 px-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.04]">
+                  {indianOwnershipData.indianStocks.map(stock => {
+                    const sh = stock.shareholding!;
+                    return (
+                      <tr key={stock.id} className="hover:bg-white/[0.03] transition">
+                        <td className="py-2.5 px-3">
+                          <div className="font-bold text-white">{stock.symbol}</div>
+                          <div className="text-[10px] text-slate-500">{stock.sector}</div>
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-200">
+                          {formatCurrency(stock.price, currency, stock.baseCurrency, exchangeRate)}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-300">
+                          {formatCompactFinancial(stock.marketCap, currency, stock.baseCurrency, exchangeRate)}
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-indigo-400">{sh.promotersPercent}%</td>
+                        <td className="py-2.5 px-3 text-sky-400">
+                          <span className="font-bold">{sh.institutionalPercent}%</span>
+                          <span className="text-[10px] text-slate-500 ml-1">
+                            ({sh.fiiPercent ?? 0}/{sh.diiPercent ?? 0})
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 font-bold text-amber-400">{sh.publicPercent}%</td>
+                        <td className={`py-2.5 px-3 ${(sh.pledgedPromoterSharesPercent ?? 0) > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                          {(sh.pledgedPromoterSharesPercent ?? 0).toFixed(1)}%
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white/[0.06] text-slate-200">
+                            {sh.majorityHolder}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => {
+                                setSelectedStockId(stock.id);
+                                setViewMode('STOCK');
+                              }}
+                              className="text-[11px] text-sky-400 hover:text-sky-300 font-bold"
+                            >
+                              Inspect
+                            </button>
+                            {onNavigateToStock && (
+                              <button
+                                onClick={() => onNavigateToStock(stock.id)}
+                                className="text-[11px] text-indigo-400 hover:text-indigo-300 font-bold"
+                              >
+                                Analyze →
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 3. Contradicting Stocks & Driver Attribution Section */}

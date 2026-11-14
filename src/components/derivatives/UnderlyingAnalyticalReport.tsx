@@ -2,38 +2,47 @@ import React, { useState } from 'react';
 import {
   Users,
   ShieldCheck,
-  Building,
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
-  AlertTriangle,
-  PieChart,
   BarChart3,
-  Calendar,
   Sparkles,
   ArrowRight,
-  Info,
 } from 'lucide-react';
-import { UnderlyingAsset, ContractPeriodType } from '../../types/derivatives';
-import { CONTRACT_PERIODS, MOCK_UNDERLYINGS } from '../../data/derivativesData';
+import { UnderlyingAsset } from '../../types/derivatives';
+import { Currency } from '../../types/market';
+import { CONTRACT_PERIODS } from '../../data/derivativesData';
 import { calculateBlackScholes } from '../../utils/blackScholes';
 import { AiFoAnomalyDrawer } from '../modals/AiFoAnomalyDrawer';
+import { formatCompactFinancial, formatCurrency } from '../../utils/currency';
 
 interface UnderlyingAnalyticalReportProps {
   underlying: UnderlyingAsset;
+  underlyings: UnderlyingAsset[];
   onSelectUnderlying: (underlying: UnderlyingAsset) => void;
+  currency: Currency;
+  exchangeRate: number;
   onOpenBuilderWithUnderlying?: () => void;
 }
 
 export const UnderlyingAnalyticalReport: React.FC<UnderlyingAnalyticalReportProps> = ({
   underlying,
+  underlyings,
   onSelectUnderlying,
+  currency,
+  exchangeRate,
   onOpenBuilderWithUnderlying,
 }) => {
-  const [selectedPeriod, setSelectedPeriod] = useState<ContractPeriodType>('1M');
   const [isAiDrawerOpen, setIsAiDrawerOpen] = useState(false);
 
   const { shareholding, financials, debtProfile } = underlying;
+
+  const fmt = (val: number, decimals = 2) =>
+    formatCurrency(val, currency, underlying.currency, exchangeRate, decimals);
+
+  // Financials & debt figures are stored in Crores (1e7) for INR and Millions (1e6) for USD
+  const compactScale = underlying.currency === 'USD' ? 1e6 : 1e7;
+  const fmtMacro = (val: number) =>
+    formatCompactFinancial(val * compactScale, currency, underlying.currency, exchangeRate);
+
+  const contractRate = underlying.country === 'US' ? 0.045 : 0.065;
 
   // Sensitivity across 5 contract periods
   const contractSensitivities = CONTRACT_PERIODS.map(period => {
@@ -42,6 +51,7 @@ export const UnderlyingAnalyticalReport: React.FC<UnderlyingAnalyticalReportProp
       strike: underlying.spot,
       dte: period.dte,
       volatility: period.typicalIv,
+      rate: contractRate,
     });
     return {
       period,
@@ -57,25 +67,41 @@ export const UnderlyingAnalyticalReport: React.FC<UnderlyingAnalyticalReportProp
     <div className="space-y-6">
       {/* Top Header Card: Asset Summary + Quick Switcher */}
       <div className="p-5 rounded-2xl bg-[#090d19] border border-white/[0.08] flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-xl font-heading font-bold text-white">
               {underlying.name} ({underlying.symbol})
             </h2>
             <span className="px-2.5 py-0.5 rounded-md bg-white/[0.06] border border-white/[0.1] text-sky-400 font-mono-code text-xs font-bold">
-              {underlying.exchange} : {underlying.currency}
+              {underlying.exchange} • Display: {currency}
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Institutional fundamental audit and F&O contract risk profile
-          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-xs text-slate-400">
+              Institutional fundamental audit and F&O contract risk profile (Lot: {underlying.lotSize} shares)
+            </p>
+            <select
+              value={underlying.symbol}
+              onChange={e => {
+                const match = underlyings.find(u => u.symbol === e.target.value);
+                if (match) onSelectUnderlying(match);
+              }}
+              className="bg-black/60 border border-white/[0.12] rounded-xl px-3 py-1 text-xs font-mono-code font-bold text-white"
+            >
+              {underlyings.map(u => (
+                <option key={u.symbol} value={u.symbol}>
+                  {u.symbol} ({u.exchange}) — {formatCurrency(u.spot, currency, u.currency, exchangeRate)}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Spot & Basis Details */}
         <div className="flex flex-wrap items-center gap-4 text-xs font-mono-code">
           <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06]">
             <span className="text-slate-400 text-[10px] block">Cash Spot</span>
-            <span className="text-base font-bold text-white">₹{underlying.spot.toLocaleString()}</span>
+            <span className="text-base font-bold text-white">{fmt(underlying.spot)}</span>
             <span className={`ml-2 text-xs font-bold ${underlying.changePercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
               {underlying.changePercent >= 0 ? '+' : ''}{underlying.changePercent}%
             </span>
@@ -83,9 +109,9 @@ export const UnderlyingAnalyticalReport: React.FC<UnderlyingAnalyticalReportProp
 
           <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06]">
             <span className="text-slate-400 text-[10px] block">Futures LTP</span>
-            <span className="text-base font-bold text-white">₹{underlying.futuresLtp.toLocaleString()}</span>
+            <span className="text-base font-bold text-white">{fmt(underlying.futuresLtp)}</span>
             <span className="ml-2 text-xs font-bold text-sky-400">
-              Basis: +₹{underlying.futuresBasis}
+              Basis: +{fmt(underlying.futuresBasis)}
             </span>
           </div>
 
@@ -177,11 +203,11 @@ export const UnderlyingAnalyticalReport: React.FC<UnderlyingAnalyticalReportProp
           <div className="grid grid-cols-2 gap-2 text-xs font-mono-code">
             <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
               <span className="text-[10px] text-slate-400 block">Quarterly PAT</span>
-              <span className="font-bold text-white">₹{financials.patQuarterlyCr.toLocaleString()} Cr</span>
+              <span className="font-bold text-white">{fmtMacro(financials.patQuarterlyCr)}</span>
             </div>
             <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
               <span className="text-[10px] text-slate-400 block">Free Cash Flow</span>
-              <span className="font-bold text-emerald-400">₹{financials.freeCashFlowCr.toLocaleString()} Cr</span>
+              <span className="font-bold text-emerald-400">{fmtMacro(financials.freeCashFlowCr)}</span>
             </div>
             <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
               <span className="text-[10px] text-slate-400 block">Trailing P/E</span>
@@ -222,11 +248,11 @@ export const UnderlyingAnalyticalReport: React.FC<UnderlyingAnalyticalReportProp
           <div className="grid grid-cols-2 gap-2 text-xs font-mono-code">
             <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
               <span className="text-[10px] text-slate-400 block">Total Debt</span>
-              <span className="font-bold text-white">₹{debtProfile.totalDebtCr.toLocaleString()} Cr</span>
+              <span className="font-bold text-white">{fmtMacro(debtProfile.totalDebtCr)}</span>
             </div>
             <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
               <span className="text-[10px] text-slate-400 block">Cash Reserve</span>
-              <span className="font-bold text-emerald-400">₹{debtProfile.cashAndEquivalentsCr.toLocaleString()} Cr</span>
+              <span className="font-bold text-emerald-400">{fmtMacro(debtProfile.cashAndEquivalentsCr)}</span>
             </div>
             <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06]">
               <span className="text-[10px] text-slate-400 block">Debt / Equity</span>
@@ -260,7 +286,7 @@ export const UnderlyingAnalyticalReport: React.FC<UnderlyingAnalyticalReportProp
               Contract Period Sensitivity Matrix (7-Day vs 14-Day vs 1-Month vs 2-Month)
             </h3>
             <p className="text-xs text-slate-400">
-              Comparative ATM Call premium, theta bleed rate, and defined-risk spread cost across maturities
+              Comparative ATM Call premium, theta bleed rate, and defined-risk spread cost across maturities ({currency})
             </p>
           </div>
           {onOpenBuilderWithUnderlying && (
@@ -300,16 +326,16 @@ export const UnderlyingAnalyticalReport: React.FC<UnderlyingAnalyticalReportProp
                     {s.period.typicalIv}%
                   </td>
                   <td className="py-3 px-3 text-emerald-400 font-bold">
-                    ₹{s.callPrice.toFixed(2)}
+                    {fmt(s.callPrice)}
                   </td>
                   <td className="py-3 px-3 text-sky-400 font-bold">
-                    ₹{s.putPrice.toFixed(2)}
+                    {fmt(s.putPrice)}
                   </td>
                   <td className="py-3 px-3 text-rose-400">
-                    -₹{Math.abs(s.callTheta).toFixed(2)} / day
+                    -{fmt(Math.abs(s.callTheta))} / day
                   </td>
                   <td className="py-3 px-3 text-indigo-300 font-bold">
-                    ₹{s.bullSpreadCost.toLocaleString()}
+                    {fmt(s.bullSpreadCost)}
                   </td>
                 </tr>
               ))}
@@ -323,6 +349,8 @@ export const UnderlyingAnalyticalReport: React.FC<UnderlyingAnalyticalReportProp
         isOpen={isAiDrawerOpen}
         onClose={() => setIsAiDrawerOpen(false)}
         underlying={underlying}
+        currency={currency}
+        exchangeRate={exchangeRate}
       />
     </div>
   );

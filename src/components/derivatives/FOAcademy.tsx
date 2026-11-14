@@ -1,7 +1,22 @@
 import React from 'react';
-import { BookOpen, ShieldAlert, Award, TrendingUp, AlertTriangle, Scale, CheckCircle2 } from 'lucide-react';
+import { BookOpen, ShieldAlert, Award, TrendingUp, Scale, CheckCircle2 } from 'lucide-react';
+import { Currency } from '../../types/market';
+import { DEFAULT_USD_INR_RATE, formatCompactFinancial, formatCurrency } from '../../utils/currency';
 
-export const FOAcademy: React.FC = () => {
+interface FOAcademyProps {
+  currency?: Currency;
+  exchangeRate?: number;
+}
+
+export const FOAcademy: React.FC<FOAcademyProps> = ({
+  currency = 'INR',
+  exchangeRate = DEFAULT_USD_INR_RATE,
+}) => {
+  const unitMove = formatCurrency(1, currency, 'INR', exchangeRate, currency === 'USD' ? 3 : 0);
+  const sampleMove = formatCurrency(20, currency, 'INR', exchangeRate, 2);
+  const sampleLowLoss = formatCurrency(5000, currency, 'INR', exchangeRate, 0);
+  const sampleHighLoss = formatCurrency(11000, currency, 'INR', exchangeRate, 0);
+
   return (
     <div className="space-y-6">
       {/* Academy Header */}
@@ -43,15 +58,15 @@ export const FOAcademy: React.FC = () => {
           <ul className="space-y-2 text-xs text-slate-300">
             <li className="flex items-start gap-2">
               <strong className="text-white font-mono-code shrink-0">Delta (Δ):</strong>
-              <span>Rate of change of option price per ₹1 move in spot. ATM options have ~0.50 delta.</span>
+              <span>Rate of change of option price per {unitMove} move in spot. ATM options have ~0.50 delta.</span>
             </li>
             <li className="flex items-start gap-2">
               <strong className="text-white font-mono-code shrink-0">Gamma (Γ):</strong>
-              <span>Acceleration of Delta per ₹1 move. Highest at ATM near expiration, causing "gamma pin risk".</span>
+              <span>Acceleration of Delta per {unitMove} move. Highest at ATM near expiration, causing "gamma pin risk".</span>
             </li>
             <li className="flex items-start gap-2">
               <strong className="text-white font-mono-code shrink-0">Theta (θ):</strong>
-              <span>Time decay in rupees per day. Accelerates exponentially in the final 14 days before expiration.</span>
+              <span>Time decay per day ({currency}). Accelerates exponentially in the final 14 days before expiration.</span>
             </li>
             <li className="flex items-start gap-2">
               <strong className="text-white font-mono-code shrink-0">Vega (ν):</strong>
@@ -82,18 +97,19 @@ export const FOAcademy: React.FC = () => {
         <div className="p-5 rounded-2xl bg-black/40 border border-white/[0.08] space-y-3">
           <h3 className="text-sm font-heading font-bold text-purple-400 flex items-center gap-2">
             <TrendingUp className="w-4 h-4" />
-            <span>3. Lot Sizing & Contract Notional Value</span>
+            <span>3. Lot Sizing & Contract Notional Value ({currency})</span>
           </h3>
           <p className="text-xs text-slate-300 leading-relaxed">
-            In Indian derivatives (NSE), contracts trade in standardized lot sizes:
+            In Indian derivatives (NSE), contracts trade in standardized lot sizes across 12 tracked Nifty stocks:
           </p>
           <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] font-mono-code text-xs space-y-1">
-            <div>RELIANCE: 250 shares / lot (Notional: ~₹7.45 Lakhs)</div>
-            <div>TCS: 175 shares / lot (Notional: ~₹7.21 Lakhs)</div>
-            <div>HDFCBANK: 550 shares / lot (Notional: ~₹9.24 Lakhs)</div>
+            <div>RELIANCE: 250 shares / lot (Notional: ~{formatCompactFinancial(745000, currency, 'INR', exchangeRate)})</div>
+            <div>TCS: 175 shares / lot (Notional: ~{formatCompactFinancial(721000, currency, 'INR', exchangeRate)})</div>
+            <div>HDFCBANK: 550 shares / lot (Notional: ~{formatCompactFinancial(924000, currency, 'INR', exchangeRate)})</div>
+            <div>SBIN: 750 shares / lot (Notional: ~{formatCompactFinancial(618375, currency, 'INR', exchangeRate)})</div>
           </div>
           <p className="text-[11px] text-slate-400">
-            A small ₹20 adverse move in spot creates a ₹5,000 to ₹11,000 cash fluctuation per lot. Always size positions relative to total portfolio NAV.
+            A small {sampleMove} adverse move in spot creates a {sampleLowLoss} to {sampleHighLoss} cash fluctuation per lot. Always size positions relative to total portfolio NAV.
           </p>
         </div>
 

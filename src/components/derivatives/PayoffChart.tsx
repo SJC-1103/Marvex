@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StrategyPayoffSummary, StrategyLeg, UnderlyingAsset } from '../../types/derivatives';
+import { Currency } from '../../types/market';
 import { formatCurrency } from '../../utils/currency';
 
 interface PayoffChartProps {
@@ -7,6 +8,8 @@ interface PayoffChartProps {
   spotPrice: number;
   underlying: UnderlyingAsset;
   legs: StrategyLeg[];
+  currency: Currency;
+  exchangeRate: number;
 }
 
 export const PayoffChart: React.FC<PayoffChartProps> = ({
@@ -14,6 +17,8 @@ export const PayoffChart: React.FC<PayoffChartProps> = ({
   spotPrice,
   underlying,
   legs,
+  currency,
+  exchangeRate,
 }) => {
   const [hoveredPoint, setHoveredPoint] = useState<{
     spot: number;
@@ -22,6 +27,9 @@ export const PayoffChart: React.FC<PayoffChartProps> = ({
     x: number;
     y: number;
   } | null>(null);
+
+  const fmt = (val: number, decimals = 2) =>
+    formatCurrency(val, currency, underlying.currency, exchangeRate, decimals);
 
   const curve = summary.curve;
   if (!curve || curve.length === 0) {
@@ -34,7 +42,7 @@ export const PayoffChart: React.FC<PayoffChartProps> = ({
 
   const width = 800;
   const height = 300;
-  const padding = { top: 25, right: 30, bottom: 40, left: 60 };
+  const padding = { top: 25, right: 30, bottom: 40, left: 78 };
 
   const innerWidth = width - padding.left - padding.right;
   const innerHeight = height - padding.top - padding.bottom;
@@ -124,7 +132,9 @@ export const PayoffChart: React.FC<PayoffChartProps> = ({
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-amber-400" />
-            <span className="text-slate-300 font-mono-code text-[11px]">Spot ₹{spotPrice}</span>
+            <span className="text-slate-300 font-mono-code text-[11px]">
+              Spot {fmt(spotPrice)}
+            </span>
           </div>
         </div>
 
@@ -132,7 +142,7 @@ export const PayoffChart: React.FC<PayoffChartProps> = ({
         <div className="flex items-center gap-2">
           {summary.breakevens.map((be, idx) => (
             <span key={idx} className="px-2 py-0.5 rounded-md bg-white/[0.06] border border-white/[0.1] text-amber-300 font-mono-code text-[10px]">
-              BE: ₹{be.toLocaleString()}
+              BE: {fmt(be)}
             </span>
           ))}
         </div>
@@ -197,6 +207,13 @@ export const PayoffChart: React.FC<PayoffChartProps> = ({
           {/* Strike Markers */}
           {legs.filter(l => l.enabled).map((leg, idx) => {
             const lx = scaleX(leg.strike);
+            const strikeLabel = formatCurrency(
+              leg.strike,
+              currency,
+              underlying.currency,
+              exchangeRate,
+              currency === underlying.currency && leg.strike % 1 === 0 ? 0 : 2
+            );
             return (
               <g key={idx}>
                 <line
@@ -215,7 +232,7 @@ export const PayoffChart: React.FC<PayoffChartProps> = ({
                   fontFamily="monospace"
                   textAnchor="middle"
                 >
-                  {leg.strike}
+                  {strikeLabel}
                 </text>
               </g>
             );
@@ -264,7 +281,7 @@ export const PayoffChart: React.FC<PayoffChartProps> = ({
             fontFamily="monospace"
             textAnchor="end"
           >
-            +₹{Math.round(yUpper * 0.8).toLocaleString()}
+            +{fmt(yUpper * 0.8, 0)}
           </text>
           <text
             x={padding.left - 8}
@@ -274,7 +291,7 @@ export const PayoffChart: React.FC<PayoffChartProps> = ({
             fontFamily="monospace"
             textAnchor="end"
           >
-            ₹0
+            {fmt(0, 0)}
           </text>
           <text
             x={padding.left - 8}
@@ -284,28 +301,28 @@ export const PayoffChart: React.FC<PayoffChartProps> = ({
             fontFamily="monospace"
             textAnchor="end"
           >
-            -₹{Math.round(Math.abs(yLower * 0.8)).toLocaleString()}
+            -{fmt(Math.abs(yLower * 0.8), 0)}
           </text>
         </svg>
 
         {/* Hover Floating Details Card */}
         {hoveredPoint && (
           <div
-            className="absolute pointer-events-none top-8 left-16 p-2.5 rounded-xl bg-[#090d19]/95 border border-white/[0.15] shadow-xl text-xs space-y-1 font-mono-code"
+            className="absolute pointer-events-none top-8 left-20 p-2.5 rounded-xl bg-[#090d19]/95 border border-white/[0.15] shadow-xl text-xs space-y-1 font-mono-code"
           >
             <div className="text-slate-400">
-              Spot at: <strong className="text-white">₹{hoveredPoint.spot.toLocaleString()}</strong>
+              Spot at: <strong className="text-white">{fmt(hoveredPoint.spot)}</strong>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-slate-400">Expiry P&L:</span>
               <span className={`font-bold ${hoveredPoint.expiryPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {hoveredPoint.expiryPnl >= 0 ? '+' : ''}₹{hoveredPoint.expiryPnl.toLocaleString()}
+                {hoveredPoint.expiryPnl >= 0 ? '+' : '-'}{fmt(Math.abs(hoveredPoint.expiryPnl))}
               </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-slate-400">Target Date P&L:</span>
               <span className={`font-bold ${hoveredPoint.targetPnl >= 0 ? 'text-sky-400' : 'text-rose-400'}`}>
-                {hoveredPoint.targetPnl >= 0 ? '+' : ''}₹{hoveredPoint.targetPnl.toLocaleString()}
+                {hoveredPoint.targetPnl >= 0 ? '+' : '-'}{fmt(Math.abs(hoveredPoint.targetPnl))}
               </span>
             </div>
           </div>

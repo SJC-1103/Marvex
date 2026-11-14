@@ -604,7 +604,11 @@ export default function App() {
         )}
 
         {activeTab === 'derivatives' && (
-          <DerivativesWorkspace />
+          <DerivativesWorkspace
+            currency={currency}
+            exchangeRate={exchangeRate}
+            availableStocks={stocks}
+          />
         )}
 
         {activeTab === 'settings' && (

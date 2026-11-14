@@ -307,6 +307,77 @@ export function calculatePortfolioShareholding(
 }
 
 /**
+ * Aggregates market-cap-weighted shareholder demographics across all tracked Indian NSE companies
+ */
+export function calculateIndianUniverseShareholding(stocks: Stock[]): {
+  shareholding: ShareholdingPattern;
+  indianStocks: Stock[];
+  totalMarketCapInr: number;
+} {
+  const indianStocks = stocks.filter(s => s.country === 'IN' && s.shareholding);
+  let totalCap = 0;
+  let weightedPromoter = 0;
+  let weightedInst = 0;
+  let weightedFii = 0;
+  let weightedDii = 0;
+  let weightedPledged = 0;
+
+  indianStocks.forEach(s => {
+    const cap = s.marketCap || s.price;
+    if (!s.shareholding || cap <= 0) return;
+    totalCap += cap;
+    weightedPromoter += cap * s.shareholding.promotersPercent;
+    weightedInst += cap * s.shareholding.institutionalPercent;
+    weightedFii += cap * (s.shareholding.fiiPercent || 0);
+    weightedDii += cap * (s.shareholding.diiPercent || 0);
+    weightedPledged += cap * (s.shareholding.pledgedPromoterSharesPercent || 0);
+  });
+
+  if (totalCap <= 0 || indianStocks.length === 0) {
+    return {
+      shareholding: {
+        promotersPercent: 0,
+        institutionalPercent: 0,
+        publicPercent: 0,
+        fiiPercent: 0,
+        diiPercent: 0,
+        pledgedPromoterSharesPercent: 0,
+        lastAuditedQuarter: 'Q2 FY26',
+        majorityHolder: 'INSTITUTIONAL',
+      },
+      indianStocks: [],
+      totalMarketCapInr: 0,
+    };
+  }
+
+  const promotersPercent = Number((weightedPromoter / totalCap).toFixed(1));
+  const institutionalPercent = Number((weightedInst / totalCap).toFixed(1));
+  const publicPercent = Number(Math.max(0, 100 - promotersPercent - institutionalPercent).toFixed(1));
+
+  let majorityHolder: 'PROMOTERS' | 'INSTITUTIONAL' | 'PUBLIC' = 'INSTITUTIONAL';
+  if (promotersPercent >= institutionalPercent && promotersPercent >= publicPercent) {
+    majorityHolder = 'PROMOTERS';
+  } else if (publicPercent >= institutionalPercent && publicPercent >= promotersPercent) {
+    majorityHolder = 'PUBLIC';
+  }
+
+  return {
+    shareholding: {
+      promotersPercent,
+      institutionalPercent,
+      publicPercent,
+      fiiPercent: Number((weightedFii / totalCap).toFixed(1)),
+      diiPercent: Number((weightedDii / totalCap).toFixed(1)),
+      pledgedPromoterSharesPercent: Number((weightedPledged / totalCap).toFixed(2)),
+      lastAuditedQuarter: `Q2 FY26 (${indianStocks.length} NSE Companies)`,
+      majorityHolder,
+    },
+    indianStocks,
+    totalMarketCapInr: totalCap,
+  };
+}
+
+/**
  * Compares portfolio performance against the overall market benchmark,
  * detects decoupling/contradictions, flags dissenting stocks, and attributes demographic drivers.
  */

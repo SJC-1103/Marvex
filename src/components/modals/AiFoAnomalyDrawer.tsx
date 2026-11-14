@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { Sparkles, X, ExternalLink, ShieldCheck, Newspaper, AlertTriangle, TrendingUp, TrendingDown, Layers, HelpCircle } from 'lucide-react';
 import { UnderlyingAsset } from '../../types/derivatives';
-import { formatCurrency } from '../../utils/currency';
+import { Currency } from '../../types/market';
+import { DEFAULT_USD_INR_RATE, formatCurrency } from '../../utils/currency';
 
 interface AiFoAnomalyDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   underlying: UnderlyingAsset;
+  currency?: Currency;
+  exchangeRate?: number;
   onLoadStrategy?: (strategyName: string) => void;
 }
 
@@ -14,6 +17,8 @@ export const AiFoAnomalyDrawer: React.FC<AiFoAnomalyDrawerProps> = ({
   isOpen,
   onClose,
   underlying,
+  currency = 'INR',
+  exchangeRate = DEFAULT_USD_INR_RATE,
   onLoadStrategy,
 }) => {
   const [loading, setLoading] = useState(false);
@@ -98,11 +103,15 @@ export const AiFoAnomalyDrawer: React.FC<AiFoAnomalyDrawerProps> = ({
           <div className="grid grid-cols-4 gap-2 text-center p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
             <div>
               <div className="text-[10px] font-mono-code text-slate-400 uppercase">Spot</div>
-              <div className="text-sm font-bold font-mono-code text-white">₹{underlying.spot.toLocaleString()}</div>
+              <div className="text-sm font-bold font-mono-code text-white">
+                {formatCurrency(underlying.spot, currency, underlying.currency, exchangeRate)}
+              </div>
             </div>
             <div>
               <div className="text-[10px] font-mono-code text-slate-400 uppercase">Max Pain</div>
-              <div className="text-sm font-bold font-mono-code text-amber-400">₹{underlying.maxPain.toLocaleString()}</div>
+              <div className="text-sm font-bold font-mono-code text-amber-400">
+                {formatCurrency(underlying.maxPain, currency, underlying.currency, exchangeRate)}
+              </div>
             </div>
             <div>
               <div className="text-[10px] font-mono-code text-slate-400 uppercase">PCR OI</div>

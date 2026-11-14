@@ -1,21 +1,41 @@
-import React, { useState } from 'react';
-import { Sliders, RotateCcw, Activity, ShieldCheck, Zap, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sliders, RotateCcw, Activity, Zap, Sparkles } from 'lucide-react';
 import { calculateBlackScholes } from '../../utils/blackScholes';
 import { UnderlyingAsset } from '../../types/derivatives';
+import { Currency } from '../../types/market';
 import { AiFoAnomalyDrawer } from '../modals/AiFoAnomalyDrawer';
 import { playQuantumBeep } from '../../utils/audio';
+import { formatCurrency } from '../../utils/currency';
 
 interface GreeksLabProps {
   underlying: UnderlyingAsset;
+  underlyings?: UnderlyingAsset[];
+  onSelectUnderlying?: (underlying: UnderlyingAsset) => void;
+  currency: Currency;
+  exchangeRate: number;
 }
 
-export const GreeksLab: React.FC<GreeksLabProps> = ({ underlying }) => {
+export const GreeksLab: React.FC<GreeksLabProps> = ({
+  underlying,
+  underlyings = [],
+  onSelectUnderlying,
+  currency,
+  exchangeRate,
+}) => {
+  const defaultRate = underlying.country === 'US' ? 4.5 : 6.5;
   const [spot, setSpot] = useState<number>(underlying.spot);
   const [strike, setStrike] = useState<number>(underlying.spot);
   const [dte, setDte] = useState<number>(30);
   const [iv, setIv] = useState<number>(24);
-  const [rate, setRate] = useState<number>(6.5); // %
+  const [rate, setRate] = useState<number>(defaultRate); // %
   const [isAiDrawerOpen, setIsAiDrawerOpen] = useState(false);
+
+  // Sync sliders when active underlying changes
+  useEffect(() => {
+    setSpot(underlying.spot);
+    setStrike(underlying.spot);
+    setRate(underlying.country === 'US' ? 4.5 : 6.5);
+  }, [underlying.symbol, underlying.spot, underlying.country]);
 
   const bsm = calculateBlackScholes({
     spot,
@@ -25,28 +45,50 @@ export const GreeksLab: React.FC<GreeksLabProps> = ({ underlying }) => {
     rate: rate / 100,
   });
 
+  const fmt = (val: number, decimals = 2) =>
+    formatCurrency(val, currency, underlying.currency, exchangeRate, decimals);
+
+  const oneUnitLabel = formatCurrency(1, currency, underlying.currency, exchangeRate, currency === underlying.currency ? 0 : 2);
+
   const handleReset = () => {
     setSpot(underlying.spot);
     setStrike(underlying.spot);
     setDte(30);
     setIv(24);
-    setRate(6.5);
+    setRate(underlying.country === 'US' ? 4.5 : 6.5);
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="p-5 rounded-2xl bg-[#090d19] border border-white/[0.08] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="p-5 rounded-2xl bg-[#090d19] border border-white/[0.08] flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-heading font-bold text-white flex items-center gap-2">
             <Activity className="w-5 h-5 text-purple-400" />
             <span>Black-Scholes-Merton Greeks Sensitivity Lab</span>
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            Real-time partial derivatives laboratory for European Call & Put contracts ({underlying.symbol})
+            Real-time partial derivatives laboratory for European Call & Put contracts ({underlying.symbol} — {underlying.exchange})
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {underlyings.length > 0 && onSelectUnderlying && (
+            <select
+              value={underlying.symbol}
+              onChange={e => {
+                const match = underlyings.find(u => u.symbol === e.target.value);
+                if (match) onSelectUnderlying(match);
+              }}
+              className="bg-black/60 border border-white/[0.12] rounded-xl px-3 py-1.5 text-xs font-mono-code font-bold text-white"
+            >
+              {underlyings.map(u => (
+                <option key={u.symbol} value={u.symbol}>
+                  {u.symbol} ({u.exchange}) — {formatCurrency(u.spot, currency, u.currency, exchangeRate)}
+                </option>
+              ))}
+            </select>
+          )}
+
           <button
             onClick={() => {
               setIsAiDrawerOpen(true);
@@ -80,11 +122,11 @@ export const GreeksLab: React.FC<GreeksLabProps> = ({ underlying }) => {
           <div className="space-y-1.5">
             <div className="flex justify-between text-xs font-mono-code">
               <span className="text-slate-400">Underlying Spot (S):</span>
-              <span className="font-bold text-white">₹{spot.toLocaleString()}</span>
+              <span className="font-bold text-white">{fmt(spot)}</span>
             </div>
             <input
               type="range"
-              min={Math.round(underlying.spot * 0.7)}
+              min={Math.max(1, Math.round(underlying.spot * 0.7))}
               max={Math.round(underlying.spot * 1.3)}
               step={underlying.strikeInterval}
               value={spot}
@@ -97,11 +139,11 @@ export const GreeksLab: React.FC<GreeksLabProps> = ({ underlying }) => {
           <div className="space-y-1.5">
             <div className="flex justify-between text-xs font-mono-code">
               <span className="text-slate-400">Strike Price (K):</span>
-              <span className="font-bold text-amber-400">₹{strike.toLocaleString()}</span>
+              <span className="font-bold text-amber-400">{fmt(strike)}</span>
             </div>
             <input
               type="range"
-              min={Math.round(underlying.spot * 0.7)}
+              min={Math.max(1, Math.round(underlying.spot * 0.7))}
               max={Math.round(underlying.spot * 1.3)}
               step={underlying.strikeInterval}
               value={strike}
@@ -173,7 +215,7 @@ export const GreeksLab: React.FC<GreeksLabProps> = ({ underlying }) => {
               </div>
               <div className="text-right">
                 <span className="text-[10px] font-mono-code text-slate-400 block">Theor. Price</span>
-                <span className="text-xl font-bold font-mono-code text-white">₹{bsm.callPrice.toFixed(2)}</span>
+                <span className="text-xl font-bold font-mono-code text-white">{fmt(bsm.callPrice)}</span>
               </div>
             </div>
 
@@ -184,7 +226,9 @@ export const GreeksLab: React.FC<GreeksLabProps> = ({ underlying }) => {
                 <span className="font-bold text-emerald-400 text-sm">+{bsm.callGreeks.delta}</span>
                 <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-50 w-72 p-2.5 rounded-xl bg-[#0c1222] border border-emerald-500/30 shadow-2xl text-[10px] text-slate-300 pointer-events-none">
                   <div className="font-bold text-emerald-300">Call Delta: Δ = N(d₁)</div>
-                  <div>Hedge ratio: Price changes by ₹{bsm.callGreeks.delta} for each ₹1 increase in underlying.</div>
+                  <div>
+                    Hedge ratio: Price changes by {fmt(bsm.callGreeks.delta)} for each {oneUnitLabel} increase in underlying.
+                  </div>
                   <div className="text-[9px] text-slate-400 mt-1">ATM ≈ +0.50 | Deep ITM → +1.00 | Far OTM → 0.00</div>
                 </div>
               </div>
@@ -195,25 +239,25 @@ export const GreeksLab: React.FC<GreeksLabProps> = ({ underlying }) => {
                 <span className="font-bold text-sky-400 text-sm">{bsm.callGreeks.gamma}</span>
                 <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-50 w-72 p-2.5 rounded-xl bg-[#0c1222] border border-sky-500/30 shadow-2xl text-[10px] text-slate-300 pointer-events-none">
                   <div className="font-bold text-sky-300">Gamma: Γ = N'(d₁) / (S · σ · √T)</div>
-                  <div>Curvature: Delta shifts by {bsm.callGreeks.gamma} for each ₹1 move in spot. Peaked at ATM.</div>
+                  <div>Curvature: Delta shifts by {bsm.callGreeks.gamma} per 1 {underlying.currency} move in spot. Peaked at ATM.</div>
                 </div>
               </div>
 
               {/* Call Theta */}
               <div className="p-2.5 rounded-xl bg-black/40 border border-white/[0.06] flex justify-between items-center group relative cursor-help">
                 <span className="text-slate-400 border-b border-dotted border-rose-400/30">Theta (θ = -∂C/∂t):</span>
-                <span className="font-bold text-rose-400 text-sm">-₹{Math.abs(bsm.callGreeks.theta).toFixed(2)} / day</span>
+                <span className="font-bold text-rose-400 text-sm">-{fmt(Math.abs(bsm.callGreeks.theta))} / day</span>
                 <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-50 w-72 p-2.5 rounded-xl bg-[#0c1222] border border-rose-500/30 shadow-2xl text-[10px] text-slate-300 pointer-events-none">
                   <div className="font-bold text-rose-300">Call Theta (Daily Decay):</div>
                   <div className="text-[9px] font-mono-code text-rose-400 my-0.5">θ = -[S·N'(d₁)·σ]/(2√T) - r·K·e^(-rT)·N(d₂)</div>
-                  <div>Options lose ₹{Math.abs(bsm.callGreeks.theta).toFixed(2)} every 24 hours strictly due to the passage of time.</div>
+                  <div>Options lose {fmt(Math.abs(bsm.callGreeks.theta))} every 24 hours strictly due to the passage of time.</div>
                 </div>
               </div>
 
               {/* Call Vega */}
               <div className="p-2.5 rounded-xl bg-black/40 border border-white/[0.06] flex justify-between items-center group relative cursor-help">
                 <span className="text-slate-400 border-b border-dotted border-purple-400/30">Vega (ν = ∂C/∂σ):</span>
-                <span className="font-bold text-purple-400 text-sm">₹{bsm.callGreeks.vega.toFixed(2)}</span>
+                <span className="font-bold text-purple-400 text-sm">{fmt(bsm.callGreeks.vega)}</span>
                 <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-50 w-72 p-2.5 rounded-xl bg-[#0c1222] border border-purple-500/30 shadow-2xl text-[10px] text-slate-300 pointer-events-none">
                   <div className="font-bold text-purple-300">Vega: ν = S · √T · N'(d₁) / 100</div>
                   <div>Gain/loss in option price if Implied Volatility rises by 1.00 percentage point.</div>
@@ -243,7 +287,7 @@ export const GreeksLab: React.FC<GreeksLabProps> = ({ underlying }) => {
               </div>
               <div className="text-right">
                 <span className="text-[10px] font-mono-code text-slate-400 block">Theor. Price</span>
-                <span className="text-xl font-bold font-mono-code text-white">₹{bsm.putPrice.toFixed(2)}</span>
+                <span className="text-xl font-bold font-mono-code text-white">{fmt(bsm.putPrice)}</span>
               </div>
             </div>
 
@@ -254,7 +298,7 @@ export const GreeksLab: React.FC<GreeksLabProps> = ({ underlying }) => {
                 <span className="font-bold text-rose-400 text-sm">{bsm.putGreeks.delta}</span>
                 <div className="absolute right-0 top-full mt-1 hidden group-hover:block z-50 w-72 p-2.5 rounded-xl bg-[#0c1222] border border-rose-500/30 shadow-2xl text-[10px] text-slate-300 pointer-events-none">
                   <div className="font-bold text-rose-300">Put Delta: Δ = N(d₁) - 1</div>
-                  <div>Price decreases by ₹{Math.abs(bsm.putGreeks.delta)} for each ₹1 increase in underlying.</div>
+                  <div>Price decreases by {fmt(Math.abs(bsm.putGreeks.delta))} for each {oneUnitLabel} increase in underlying.</div>
                   <div className="text-[9px] text-slate-400 mt-1">ATM ≈ -0.50 | Deep ITM → -1.00 | Far OTM → 0.00</div>
                 </div>
               </div>
@@ -272,7 +316,7 @@ export const GreeksLab: React.FC<GreeksLabProps> = ({ underlying }) => {
               {/* Put Theta */}
               <div className="p-2.5 rounded-xl bg-black/40 border border-white/[0.06] flex justify-between items-center group relative cursor-help">
                 <span className="text-slate-400 border-b border-dotted border-rose-400/30">Theta (θ = -∂P/∂t):</span>
-                <span className="font-bold text-rose-400 text-sm">-₹{Math.abs(bsm.putGreeks.theta).toFixed(2)} / day</span>
+                <span className="font-bold text-rose-400 text-sm">-{fmt(Math.abs(bsm.putGreeks.theta))} / day</span>
                 <div className="absolute right-0 top-full mt-1 hidden group-hover:block z-50 w-72 p-2.5 rounded-xl bg-[#0c1222] border border-rose-500/30 shadow-2xl text-[10px] text-slate-300 pointer-events-none">
                   <div className="font-bold text-rose-300">Put Theta (Daily Decay):</div>
                   <div className="text-[9px] font-mono-code text-rose-400 my-0.5">θ = -[S·N'(d₁)·σ]/(2√T) + r·K·e^(-rT)·N(-d₂)</div>
@@ -283,7 +327,7 @@ export const GreeksLab: React.FC<GreeksLabProps> = ({ underlying }) => {
               {/* Put Vega */}
               <div className="p-2.5 rounded-xl bg-black/40 border border-white/[0.06] flex justify-between items-center group relative cursor-help">
                 <span className="text-slate-400 border-b border-dotted border-purple-400/30">Vega (ν = ∂P/∂σ):</span>
-                <span className="font-bold text-purple-400 text-sm">₹{bsm.putGreeks.vega.toFixed(2)}</span>
+                <span className="font-bold text-purple-400 text-sm">{fmt(bsm.putGreeks.vega)}</span>
                 <div className="absolute right-0 top-full mt-1 hidden group-hover:block z-50 w-72 p-2.5 rounded-xl bg-[#0c1222] border border-purple-500/30 shadow-2xl text-[10px] text-slate-300 pointer-events-none">
                   <div className="font-bold text-purple-300">Put Vega = Call Vega</div>
                   <div>Symmetric sensitivity to market-wide volatility expansion or contraction.</div>
@@ -358,6 +402,8 @@ export const GreeksLab: React.FC<GreeksLabProps> = ({ underlying }) => {
         isOpen={isAiDrawerOpen}
         onClose={() => setIsAiDrawerOpen(false)}
         underlying={underlying}
+        currency={currency}
+        exchangeRate={exchangeRate}
       />
     </div>
   );
